@@ -1,0 +1,134 @@
+
+static ReadSprite(const filePath[])
+{
+	// cstrike_lv
+	// cstrike_addon
+	// cstrike_schinese
+	// cstrike_hd
+	// cstrike
+	// cstrike_downloads
+	// fallback_dir
+	// valve_schinese
+	// valve_hd
+	// base
+	// valve
+	// platform
+	static valvePathId[][] = { "GAME", "GAMECONFIG", "GAMEDOWNLOAD", "GAME_FALLBACK", "DEFAULTGAME", "BASE", "PLATFORM" };
+	new fileHandle;
+	for (new pathIdId; pathIdId < sizeof(valvePathId) && !(fileHandle = fopen(filePath, "rb", true, valvePathId[pathIdId])); pathIdId++) { }
+	if (!fileHandle) return;
+	enum sSpriteHeader
+	{
+		// 4个字符
+		_:
+			SH_Ident,
+		_:
+			SH_Version,
+		_:
+			SH_Type,
+		_:
+			SH_TexFormat,
+		// 最小包围圆半径=开方(宽度平方+高度平方)/2
+		Float:
+			SH_BoundingRadius,
+		_:
+			SH_MaxWidth,
+		_:
+			SH_MaxHeight,
+		_:
+			SH_NumFrames,
+		Float:
+			SH_BeamLength,
+		// 0可能表示同步更新动画帧,1可能表示异步更新动画帧
+		bool:
+			SH_SyncType
+	}
+	new spriteHeader[sSpriteHeader];
+	if (fread_blocks(fileHandle, spriteHeader, sizeof(spriteHeader), BLOCK_INT) != sizeof(spriteHeader)) { fclose(fileHandle); return; }
+	server_print("[AMXX]SH_Ident %d", spriteHeader[SH_Ident]);
+	server_print("[AMXX]SH_Version %d", spriteHeader[SH_Version]);
+	server_print("[AMXX]SH_Type %d", spriteHeader[SH_Type]);
+	server_print("[AMXX]SH_TexFormat %d", spriteHeader[SH_TexFormat]);
+	server_print("[AMXX]SH_BoundingRadius %f", spriteHeader[SH_BoundingRadius]);
+	server_print("[AMXX]SH_MaxWidth %d", spriteHeader[SH_MaxWidth]);
+	server_print("[AMXX]SH_MaxHeight %d", spriteHeader[SH_MaxHeight]);
+	server_print("[AMXX]SH_NumFrames %d", spriteHeader[SH_NumFrames]);
+	server_print("[AMXX]SH_BeamLength %f", spriteHeader[SH_BeamLength]);
+	server_print("[AMXX]SH_SyncType %d", spriteHeader[SH_SyncType]);
+	
+	new numColors[1];
+	if (fread_blocks(fileHandle, numColors, sizeof(numColors), BLOCK_SHORT) != sizeof(numColors)) { fclose(fileHandle); return; }
+	server_print("[AMXX]numColors %d", numColors);
+	for (new color[3], colorId; colorId < numColors[0]; colorId++)
+	{
+		if (fread_blocks(fileHandle, color, sizeof(color), BLOCK_BYTE) != sizeof(color)) { fclose(fileHandle); return; }
+		if (color[0] < 0) color[0] += 256;
+		if (color[1] < 0) color[1] += 256;
+		if (color[2] < 0) color[2] += 256;
+	}
+	
+	enum sSpriteFrame
+	{
+		_:
+			SF_Left,
+		_:
+			SF_Top,
+		_:
+			SF_Width,
+		_:
+			SF_Height
+	}
+	for (new frame[sSpriteFrame], frameId; frameId < spriteHeader[SH_NumFrames]; frameId++)
+	{
+		const SpriteFrameTypes:SFT_Single = any:0;
+		const SpriteFrameTypes:SFT_Group = any:1;
+		new SpriteFrameTypes:frameType[1];
+		if (fread_blocks(fileHandle, frameType, sizeof(frameType), BLOCK_INT) != sizeof(frameType)) { fclose(fileHandle); return; }
+		switch (frameType[0])
+		{
+			case SFT_Single:
+			{
+				if (fread_blocks(fileHandle, frame, sizeof(frame), BLOCK_INT) != sizeof(frame)) { fclose(fileHandle); return; }
+				server_print("frame[%d] = %d %d %d %d", frameId, frame[SF_Left], frame[SF_Top], frame[SF_Width], frame[SF_Height]);
+				for (new colorId[1], numPixels = frame[SF_Width] * frame[SF_Height], pixelId; pixelId < numPixels; pixelId++)
+				{
+					if (fread_blocks(fileHandle, colorId, sizeof(colorId), BLOCK_BYTE) != sizeof(colorId)) { fclose(fileHandle); return; }
+					if (colorId[0] < 0) colorId[0] += 256;
+				}
+			}
+			case SFT_Group:
+			{
+				new group_NumFrames[1];
+				if (fread_blocks(fileHandle, group_NumFrames, sizeof(group_NumFrames), BLOCK_INT) != sizeof(group_NumFrames)) { fclose(fileHandle); return; }
+				new Float:frameTime[1], Array:frameTimes = ArrayCreate(1, group_NumFrames[0]);
+				for (new frameId; frameId < group_NumFrames[0]; frameId++)
+				{
+					if (fread_blocks(fileHandle, frameTime, sizeof(frameTime), BLOCK_INT) != sizeof(frameTime)) { fclose(fileHandle); return; }
+					ArrayPushArray(frameTimes, frameTime);
+					server_print("group[%d].frameTime = %f", frameId, frameTime[0]);
+				}
+				ArrayDestroy(frameTimes);
+				for (new frameId; frameId < group_NumFrames[0]; frameId++)
+				{
+					if (fread_blocks(fileHandle, frame, sizeof(frame), BLOCK_INT) != sizeof(frame)) { fclose(fileHandle); return; }
+					server_print("frame[%d] = %d %d %d %d", frameId, frame[SF_Left], frame[SF_Top], frame[SF_Width], frame[SF_Height]);
+					for (new colorId[1], numPixels = frame[SF_Width] * frame[SF_Height], pixelId; pixelId < numPixels; pixelId++)
+					{
+						if (fread_blocks(fileHandle, colorId, sizeof(colorId), BLOCK_BYTE) != sizeof(colorId)) { fclose(fileHandle); return; }
+						if (colorId[0] < 0) colorId[0] += 256;
+					}
+				}
+			}
+			default: { fclose(fileHandle); return; }
+		}
+	}
+	fclose(fileHandle);
+}
+
+
+
+
+
+
+
+

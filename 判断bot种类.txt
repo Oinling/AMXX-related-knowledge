@@ -1,0 +1,28 @@
+
+stock Bot_GetType(id)
+{
+	// not bot
+	if (!is_user_bot(id)) return 0
+	
+	new tracker[2], friends[2], ah[2]
+	get_user_info(id, "tracker", tracker, 1)
+	get_user_info(id, "friends", friends, 1)
+	get_user_info(id, "_ah", ah, 1)
+	
+	// PodBot / YaPB / SyPB
+	if (tracker[0] == '0' && friends[0] == '0' && ah[0] == '0') return 1
+	
+	// Zbot
+	return 2
+}
+
+static bool:is_user_czbot(id)
+{
+	if (!is_user_bot(id)) return false;
+	
+	new tracker[2], friends[2], ah[2];
+	get_user_info(id, "tracker", tracker, 1);
+	get_user_info(id, "friends", friends, 1);
+	get_user_info(id, "_ah", ah, 1);
+	return tracker[0] != '0' || friends[0] != '0' || ah[0] != '0';
+}

@@ -1,0 +1,4 @@
+message_begin(MSG_ONE, get_user_msgid("StatusText"), {0,0,0}, id)
+write_byte(0)			// ²»Ã÷
+write_string("hello world")	// ×Ö·û´®
+message_end()

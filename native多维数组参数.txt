@@ -1,0 +1,18 @@
+
+native PrintTexts(const texts[][], numTexts = sizeof(texts));
+public @PrintTexts(pluginId, numParams)
+{
+	new numSnds = get_param(2);
+	if (numSnds < 1) return;
+	
+	static text[64], data[10 * 64];
+	get_array(1, data, charsmax(data));
+	if (data[0] == 4 && !data[1]) return;
+	
+	for (new textOfs, dataOfs, sndId; sndId < numSnds; sndId++)
+	{
+		for (textOfs = 0, dataOfs = data[sndId] / 4 + sndId; data[dataOfs];) text[textOfs++] = data[dataOfs++];
+		text[textOfs] = EOS;
+		server_print("[AMXX] %s", text);
+	}
+}

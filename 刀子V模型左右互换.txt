@@ -1,0 +1,10 @@
+register_forward(FM_UpdateClientData, "fw_UpdateClientData_Post", 1)
+
+public fw_UpdateClientData_Post(id, sendweapons, cd_handle)
+{
+	if (get_user_weapon(id)!=CSW_KNIFE) return FMRES_IGNORED
+	
+	set_cd(cd_handle, CD_ID, CSW_C4)
+	
+	return FMRES_HANDLED
+}

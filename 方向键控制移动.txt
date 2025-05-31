@@ -1,0 +1,25 @@
+// 如果同时按住相反按键,禁止移动
+if ((W && S && A && D) || (W && S && !A && !D) || (!W && !S && A && D)) return
+
+if (W && S)			// 如果按住WS的情况下按A或D
+{
+	if (A) 角度 += 90	// ←
+	else 角度 -= 90		// →
+}
+else if (A && D)		// 如果按住AD的情况下按W或S
+{
+	if (S) 角度 += 180	// ↓
+	else 角度 += 0.0	// 无用代码(↑)
+}
+else if (W && A) 角度 += 45	// ↖
+else if (W && D) 角度 -= 45	// ↗
+else if (S && A) 角度 += 135	// ↙
+else if (S && D) 角度 -= 135	// ↘
+else if (A) 角度 += 90		// ←
+else if (D) 角度 -= 90		// →
+else if (S) 角度 += 180		// ↓
+else 角度 += 0.0		// 无用代码(↑)
+
+angle_vector(角度, 1, 向量)
+
+xs_vec_mul_scalar(向量, 250.0, 向量)

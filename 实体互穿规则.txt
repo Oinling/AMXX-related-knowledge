@@ -1,0 +1,171 @@
+
+/// 操作方式:有交集模式
+/// 关于两个实体之间的碰撞检测,两个实体无分组,或分组有交集,允许产生碰撞
+/// 关于坐标与实体之间的碰撞检测(EngFunc_PointContents),若实体无分组,或分组与mask有交集,允许产生碰撞
+#define GROUP_OP_AND	0
+
+/// 操作方式:无交集模式
+/// 关于两个实体之间的碰撞检测,两个实体无分组,或分组无交集,允许产生碰撞
+/// 关于坐标与实体之间的碰撞检测(EngFunc_PointContents),若实体无分组,或分组与mask无交集,允许产生碰撞
+#define GROUP_OP_NAND	1
+
+// mask	在检测坐标与实体碰撞时,坐标的分组
+// op	操作方式:若填写GROUP_OP_AND和GROUP_OP_NAND以外的数值,表示分组不影响碰撞检测
+// 此函数在每次碰撞检测前都需要设置
+// EngFunc_SetGroupMask(mask, op);
+
+/// 每次AddToFullPack,若收信者有分组,
+/// 会执行EngFunc_SetGroupMask(收信者.groupinfo, GROUP_OP_AND)
+/// 若写信者和收信者无法产生碰撞,将不会发信,收信者将看不见写信者.
+/// 若可产生碰撞,会执行EngFunc_SetGroupMask(0, GROUP_OP_AND)
+/// 
+/// 然后,所以,不建议设置分组时使用GROUP_OP_AND模式,会导致看不见写信者.
+/// 如果要给某个玩家设置分组,建议每次AddToFullPack之后将op设为GROUP_OP_AND以外的数值
+
+
+#include <amxmodx>
+#include <fakemeta>
+#include <xs>
+
+#pragma semicolon 1;
+
+public plugin_precache()
+{
+	register_plugin("测试插件", "1.0.0", "偶萤蛉(Oinling)");
+	register_forward(FM_AddToFullPack, "Entity_WriteLetter_Post", 1);
+	register_forward(FM_PlayerPreThink, "Player_PreThink_Post", 1);
+}
+
+public Player_PreThink_Post(playerEntId)
+{
+	if (!is_user_alive(playerEntId)) return;
+	
+	new Float:origin[3], Float:velocity[3], Float:thisMin[3], Float:thisMax[3], Float:otherMin[3], Float:otherMax[3];
+	pev(playerEntId, pev_origin, origin);
+	pev(playerEntId, pev_velocity, velocity);
+	pev(playerEntId, pev_mins, thisMin);
+	pev(playerEntId, pev_maxs, thisMax);
+	new Float:deltaTime; global_get(glb_frametime, deltaTime);
+	new Float:length = 1.0 + xs_vec_len(velocity) * deltaTime;
+	for (new axis = 3; 0 < axis--;)
+	{
+		thisMin[axis] += origin[axis] - length;
+		thisMax[axis] += origin[axis] + length;
+	}
+
+	new playerEntIdMap[32], playerEntIdCount, bool:setGroup;
+	get_players(playerEntIdMap, playerEntIdCount, "a");
+	for (new playerEntIdId; playerEntIdId < playerEntIdCount; playerEntIdId++)
+	{
+		new entId = playerEntIdMap[playerEntIdId];
+		if (entId == playerEntId) continue;
+
+		pev(entId, pev_origin, origin);
+		pev(entId, pev_mins, otherMin);
+		pev(entId, pev_maxs, otherMax);
+		xs_vec_add(origin, otherMin, otherMin);
+		xs_vec_add(origin, otherMax, otherMax);
+		if (otherMax[0] < thisMin[0] || thisMax[0] < otherMin[0]) continue;
+		if (otherMax[1] < thisMin[1] || thisMax[1] < otherMin[1]) continue;
+		if (otherMax[2] < thisMin[2] || thisMax[2] < otherMin[2]) continue;
+
+		setGroup = true;
+		set_pev(entId, pev_groupinfo, 1);
+	}
+	if (setGroup) set_pev(playerEntId, pev_groupinfo, 1), engfunc(EngFunc_SetGroupMask, 0, GROUP_OP_NAND);
+}
+
+public Entity_WriteLetter_Post(letter, entId, entEdict, hostEdict, hostFlags, entIsPlayer, pSet)
+{
+	// 若写信者存在,且收信者与写信者分组有交集,修改信件内容,让收信者误以为写信者碰撞类型为SOLID_NOT
+	if (pev_valid(entId) && pev(hostEdict, pev_groupinfo) & pev(entId, pev_groupinfo)) set_es(letter, ES_Solid, SOLID_NOT);
+}
+
+
+
+#include <amxmodx>
+#include <fakemeta>
+
+#pragma semicolon 1;
+
+#if (182 < AMXX_VERSION_NUM)
+static m_iTeam;					// '玩家队伍索引'属性的准确编号,需要在运行时获取
+#else
+const m_iTeam = 114;				// '玩家队伍索引'属性的编号,硬编码可能会因为cs版本升级而不兼容
+const MAX_PLAYERS = 32;				// 最大玩家数量
+static MaxClients;				// 当前最大玩家数量,需要在运行时获取
+#endif
+
+const CT_TEAM_INDEX = 2;			// 特警的队伍索引
+const DEFAULT_GROUP_BIT = 0b_0;			// 默认分组的标志
+const COLLISIONLESS_GROUP_BIT = 0b_1;		// 无碰撞分组的标志
+const GROUP_OP_AND = 0;				// 有交集模式:两个实体无分组,或分组有交集,允许产生碰撞
+const GROUP_OP_NAND = 1;			// 无交集模式:两个实体无分组,或分组无交集,允许产生碰撞
+
+static gGroupedEntityCount;			// 已分组实体索引的数量
+static gGroupedEntityIndices[MAX_PLAYERS];	// 已分组实体索引数组
+
+public plugin_precache()
+{
+	register_plugin("特警无碰撞", "1.0.0", "偶萤蛉(Oinling)");
+
+	register_forward(FM_PlayerPreThink, "Player_PreThink_Post", 1);
+	register_forward(FM_PlayerPostThink, "Player_PostThink_Pre");
+	register_forward(FM_AddToFullPack, "Entity_WriteLetter_Post", 1);
+
+	#if (182 < AMXX_VERSION_NUM)
+	m_iTeam = find_ent_data_info("CBasePlayer", "m_iTeam") / 4;
+	#else
+	MaxClients = get_maxplayers();
+	#endif
+}
+
+/** 在碰撞检测之前,将特警存入无碰撞分组. */
+public Player_PreThink_Post(playerEntId)
+{
+	// 若playerEntId不指向特警,无需做任何事
+	if (!is_user_alive(playerEntId) || get_pdata_int(playerEntId, m_iTeam) != CT_TEAM_INDEX) return;
+
+	new bool:grouped;
+	for (new entId = MaxClients; entId; entId--)				// 将其它特警全部移动到无碰撞分组
+	{
+		if (entId == playerEntId || !is_user_alive(entId) || get_pdata_int(entId, m_iTeam) != CT_TEAM_INDEX) continue;
+		
+		grouped = true;
+		set_pev(entId, pev_groupinfo, COLLISIONLESS_GROUP_BIT);
+		gGroupedEntityIndices[gGroupedEntityCount++] = entId;		// 记录这个特警的实体索引
+	}
+	if (grouped)								// 若除了playerEntId,有其它特警被放入无碰撞分组,那么playerEntId也需要放入分组
+	{
+		set_pev(playerEntId, pev_groupinfo, COLLISIONLESS_GROUP_BIT);
+		gGroupedEntityIndices[gGroupedEntityCount++] = playerEntId;	// 记录这个特警的实体索引
+		engfunc(EngFunc_SetGroupMask, 0, GROUP_OP_NAND);		// 暂时切换到无交集模式
+	}
+}
+
+/** 在碰撞检测之后,将特警存入默认分组. */
+public Player_PostThink_Pre(playerEntId)
+{
+	for (new entIdId; entIdId < gGroupedEntityCount; entIdId++)		// 将无碰撞分组内的特警移动到默认分组
+	{
+		set_pev(gGroupedEntityIndices[entIdId], pev_groupinfo, DEFAULT_GROUP_BIT);
+		engfunc(EngFunc_SetGroupMask, 0, GROUP_OP_AND);			// 恢复到有交集模式
+	}
+	gGroupedEntityCount = 0;						// 清空已分组实体索引数组
+}
+
+/** 在特警写信时,让收信的特警误以为对方无碰撞. */
+public Entity_WriteLetter_Post(letter, entId, entEdict, hostEdict, hostFlags, entIsPlayer, pSet)
+{
+	// 若写信者不是人,或是死人,跳过
+	if (!is_user_alive(entId)) return;
+	
+	// 若写信者不是特警,跳过
+	new teamId = get_pdata_int(entId, m_iTeam);
+	if (teamId != 2) return;
+
+	// 若写信者与收信者是队友,修改信件内容,让收信者误以为写信者碰撞类型为SOLID_NOT
+	if (teamId == get_pdata_int(hostEdict, m_iTeam)) set_es(letter, ES_Solid, SOLID_NOT);
+}
+
+

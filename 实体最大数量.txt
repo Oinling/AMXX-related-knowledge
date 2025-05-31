@@ -1,0 +1,46 @@
+
+// 理论上的最大数量是4096,除非mp.dll的源码中,实体索引相关的掩码操作发生改变
+const MAX_THEORETICAL_ENTITIES = 4096;
+
+// effects.h和effects.cpp中可以看到,实体索引虽然是int类型,但最大有效值被限制为4095
+
+	int GetStartEntity() const { return pev->sequence & 0xFFF; }
+	int GetEndEntity() const { return pev->skin & 0xFFF; }
+void CBeam::SetStartEntity(int entityIndex)
+{
+	pev->sequence = (entityIndex & 0x0FFF) | ((pev->sequence & 0xF000) << 12);
+	pev->owner = INDEXENT(entityIndex);
+}
+
+void CBeam::SetEndEntity(int entityIndex)
+{
+	pev->skin = (entityIndex & 0x0FFF) | ((pev->skin & 0xF000) << 12);
+	pev->aiment = INDEXENT(entityIndex);
+}
+
+
+
+
+
+
+
+// client.h文件中的常量
+
+const int MAX_ENTITIES = 1380;
+
+
+
+
+
+
+
+
+
+
+// const.h文件中的宏定义
+
+// How many bits to use to encode an edict.
+#define MAX_EDICT_BITS              11 // # of bits needed to represent max edicts
+
+// Max # of edicts in a level (2048)
+#define MAX_EDICTS                  BIT(MAX_EDICT_BITS)

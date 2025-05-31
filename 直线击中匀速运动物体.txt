@@ -1,0 +1,18 @@
+
+	static Float:start[3], Float:end[3], Float:vel[3], Float:spd, Float:LeapSpd, Float:HitTime[4]
+	pd_GetOrigin(id, start, 1)
+	pd_GetOrigin(target, end, 1)
+	pev(target, pev_velocity, vel)
+	spd=vector_length(vel)
+	LeapSpd=500.0
+	if (spd)
+	{
+		for (new n=0;n<3;n++) HitTime[n]=floatabs(start[n]-end[n])/floatabs(LeapSpd-vel[n])
+		HitTime[3]=floatsqroot(HitTime[0]*HitTime[0]+HitTime[1]*HitTime[1])
+		HitTime[3]=floatsqroot(HitTime[2]*HitTime[2]+HitTime[3]*HitTime[3])
+		for (new n=0;n<3;n++) end[n]+=(vel[n]*HitTime[3])
+	}
+	for (new n=0;n<3;n++) vel[n]=end[n]-start[n]
+	spd=vector_length(vel)
+	for (new n=0;n<3;n++) vel[n]=vel[n]/spd*LeapSpd
+	set_pev(id, pev_velocity, vel)

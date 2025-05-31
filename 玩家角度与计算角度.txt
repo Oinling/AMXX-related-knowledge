@@ -1,0 +1,16 @@
+
+	new Float:org1[3], Float:org2[3], Float:vec[3], Float:ang[3]
+	pev(id, pev_origin, org1)
+	org1[2]+=17.0
+	velocity_by_aim(id, 9999, vec)
+	xs_vec_add(org1, vec, org2)
+	engfunc(EngFunc_TraceLine, org1, org2, 0, id, 0)
+	get_tr2(0, TR_vecEndPos, org2)
+	for (new n=0;n<3;n++) vec[n]=org2[n]-org1[n]
+	engfunc(EngFunc_VecToAngles, vec, ang)
+	if (270.0<ang[0]<360.0) ang[0]-=360.0
+	if (ang[1]>180.0) ang[1]-=360.0
+	ang[0]*=-1.0
+	set_pev(id, pev_v_angle, ang)
+	set_pev(id, pev_angles, ang)	//获取angles时,ang[0]自动/=-3.0
+	set_pev(id, pev_fixangle, 1)	//重要

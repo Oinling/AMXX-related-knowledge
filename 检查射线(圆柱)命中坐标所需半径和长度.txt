@@ -1,0 +1,35 @@
+
+/**
+ * 计算圆柱射线包含坐标所需的最小半径和长度(用圆柱表面上一点,计算圆柱最小半径和长度).
+ *
+ * @param cStart	圆柱射线起点
+ * @param cDir		圆柱射线方向
+ * @param point		需要被包含的坐标(圆柱表面上任意坐标)
+ * @param radius	输出圆柱半径,或0(坐标在射线后方)
+ * @param length	输出圆柱长度,或0(坐标在射线后方)
+ *
+ * @return		true=坐标不在射线后方,false=坐标在射线后方
+*/
+stock bool:GetCylinderRayInfoP(const Float:cStart[3], const Float:cDir[3], const Float:point[3], &Float:radius, &Float:length)
+{
+	new Float:vecIdeal[3];
+	xs_vec_sub(point, cStart, vecIdeal);
+	
+	// 计算需要多长的圆柱才能包裹目标(直角三角形邻边)
+	length = xs_vec_dot(cDir, vecIdeal);
+	
+	// 如果目标在圆柱背后,无法包裹,返回假
+	if (length < 0.0) { length = radius = 0.0; return false; }
+	
+	// 计算圆柱起点到目标的距离(直角三角形斜边)
+	new Float:distance = get_distance_f(cStart, point);
+	// 计算圆柱方向与目标方向的夹角的cos值
+	new Float:cosA = length / distance;
+	
+	// 计算圆柱包裹目标所需半径(直角三角形对边)
+	// radius = floatsqroot(distance * distance - length * length)
+	radius = floatsin(floatacos(cosA, degrees), degrees) * distance;
+	
+	// 返回真
+	return true;
+}

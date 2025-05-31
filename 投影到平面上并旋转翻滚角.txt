@@ -1,0 +1,68 @@
+
+
+public Player_PreThink_Post(playerEntId)
+{
+	if (!is_user_alive(playerEntId)) return;
+	
+	static entId;
+	if (IsKeyUp(playerEntId, IN_USE))
+	{
+		if (entId)
+		{
+			set_pev(entId, pev_flags, FL_KILLME);
+			entId = 0;
+			return;
+		}
+
+		new Float:origin[3], Float:vecF[3], Float:dest[3];
+		pev(playerEntId, pev_origin, origin);
+		pev(playerEntId, pev_view_ofs, dest);
+		xs_vec_add(origin, dest, origin);
+		velocity_by_aim(playerEntId, 1, vecF);
+		xs_vec_add_scaled(origin, vecF, 81920.0, dest);
+		engfunc(EngFunc_TraceLine, origin, dest, DONT_IGNORE_MONSTERS, playerEntId, 0);
+
+		new Float:fraction;
+		get_tr2(0, TR_flFraction, fraction);
+		if (fraction == 0.0 || fraction == 1.0) return;
+		
+		new Float:vecNormal[3];
+		get_tr2(0, TR_vecPlaneNormal, vecNormal);
+		if (xs_vec_equal(vecNormal, NULL_VECTOR)) return;
+
+		get_tr2(0, TR_vecEndPos, dest);
+		entId = Model_Create(dest, playerEntId, gModel_SzId, gModel_CacheId);
+		if (entId)
+		{
+			xs_vec_neg(vecF, vecF);
+			
+			new Float:vecP[3];
+			fff2(vecF, vecNormal, vecP);
+
+			new Float:angles[3];
+			vector_to_angle(vecP, angles);
+			new Float:vecY[3], Float:vecX[3];
+			angles[0] *= -1.0;
+			angle_vector(angles, ANGLEVECTOR_UP, vecY);
+			angle_vector(angles, ANGLEVECTOR_RIGHT, vecX);
+			new Float:y = xs_vec_dot(vecNormal, vecY);
+			new Float:x = xs_vec_dot(vecNormal, vecX);
+			angles[0] *= -1.0;
+			angles[2] = floatatan2(x, y, degrees);
+			set_pev(entId, pev_angles, angles);
+		}
+	}
+	if (entId)
+	{
+		new b = pev(entId, pev_controller_0);
+		set_pev(entId, pev_controller_0, ++b % 255);
+	}
+}
+
+static fff2(const Float:vecF[3], const Float:vecNormal[3], Float:vecP[3])
+{
+	if (vecNormal[2] == 0.0) { vecP[0] = vecP[1], vecP[2] = 0.0 < vecF[2] ? 1.0 : -1.0; return; }
+	vecP = vecF;
+	vecP[2] -= xs_vec_dot(vecP, vecNormal) / vecNormal[2];
+	xs_vec_normalize(vecP, vecP);
+}

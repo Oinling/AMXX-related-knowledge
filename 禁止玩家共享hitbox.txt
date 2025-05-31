@@ -1,0 +1,72 @@
+#include <amxmodx>
+#include <fakemeta>
+#include <hamsandwich>
+#include <xs>
+
+#pragma semicolon 1;
+
+#if 183 < AMXX_VERSION_NUM
+static m_modelIndexPlayer;
+#else
+const m_modelIndexPlayer = 491;
+static gRegId_PlayerPreThink_Pre;
+#endif
+#if !defined(MAX_PLAYERS)
+const MAX_PLAYERS = 32;
+#endif
+static gModelIndex[1 + MAX_PLAYERS];
+
+public plugin_init()
+{
+	register_plugin("禁止玩家共享相同hitbox", "1", "偶萤蛉(Oinling)");
+
+	register_forward(FM_SetClientKeyValue, "Player_SetKeyValue_Post", 1);
+
+	#if 183 < AMXX_VERSION_NUM
+	const sizeofInt32 = 4;
+	m_modelIndexPlayer = find_ent_data_info("CBasePlayer", "m_modelIndexPlayer") / sizeofInt32;
+	RegisterHam(Ham_Spawn, "player", "Player_Spawn_Post", 1, true);
+	#else
+	if (!get_cvar_pointer("bot_quota")) gRegId_PlayerPreThink_Pre = -1;
+	RegisterHam(Ham_Spawn, "player", "Player_Spawn_Post", 1);
+	#endif
+}
+
+public Player_SetKeyValue_Post(playerEntId, infobufferPtr, key[], value[])
+{
+	if (!equal(key, "model")) return;
+	gModelIndex[playerEntId] = engfunc(EngFunc_ModelIndex, fmt("models/player/%s/%s.mdl", value, value));
+	set_pdata_int(playerEntId, m_modelIndexPlayer, gModelIndex[playerEntId]);
+}
+
+public client_putinserver(playerEntId)
+{
+	#if AMXX_VERSION_NUM <= 183
+	if (!gRegId_PlayerPreThink_Pre && is_user_czbot(playerEntId))
+		gRegId_PlayerPreThink_Pre = register_forward(FM_PlayerPreThink, "Player_PreThink_Pre");
+	#endif
+}
+#if AMXX_VERSION_NUM <= 183
+public Player_PreThink_Pre(playerEntId)
+{
+	if (!is_user_czbot(playerEntId)) return;
+	RegisterHamFromEntity(Ham_Spawn, playerEntId, "Player_Spawn_Post", 1);
+	unregister_forward(FM_PlayerPreThink, gRegId_PlayerPreThink_Pre);
+}
+#endif
+public Player_Spawn_Post(playerEntId)
+{
+	if (!is_user_alive(playerEntId)) return;
+	set_pdata_int(playerEntId, m_modelIndexPlayer, gModelIndex[playerEntId]);
+}
+
+static stock bool:is_user_czbot(playerEntId)
+{
+	if (!is_user_bot(playerEntId)) return false;
+	
+	new tracker[2], friends[2], ah[2];
+	get_user_info(playerEntId, "tracker", tracker, 1);
+	get_user_info(playerEntId, "friends", friends, 1);
+	get_user_info(playerEntId, "_ah", ah, 1);
+	return tracker[0] != '0' || friends[0] != '0' || ah[0] != '0';
+}

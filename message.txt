@@ -1,0 +1,4 @@
+
+TE_EXPLOSION2从坐标向四面八方爆出大量颗粒
+TE_IMPLOSION从四方radius范围向坐标发射count条子弹轨迹
+TE_FIREFIELD在坐标周围radius范围内显示count个indexalpha或alphatest格式的spr.

@@ -1,0 +1,26 @@
+	new Float:start[3], Float:end[3], Float:vec[3]
+	pev(id, pev_origin, start)
+	pev(id,	pev_view_ofs, vec)
+	xs_vec_add(start, vec, start)		//获取眼睛位置坐标(start+vec)
+	velocity_by_aim(id, 9999, vec)
+	xs_vec_add(start, vec, end)		//获取眼睛前方9999单位距离的坐标(无视墙壁)
+	engfunc(EngFunc_TraceLine, start, end, 0, id, 0)
+	get_tr2(0, TR_vecEndPos, end)		//总之就是获取瞄准坐标(会被各种东西阻挡,不会穿墙)
+	engfunc(EngFunc_MessageBegin, MSG_PVS, SVC_TEMPENTITY, end, 0)
+	write_byte(TE_BEAMENTPOINT)
+	write_short(id|0x1000)
+	write_coord(floatround(end[0]))
+	write_coord(floatround(end[1]))
+	write_coord(floatround(end[2]))
+	write_short(g_laserSpr)
+	write_byte(0)	//starting frame
+	write_byte(1)	//frame rate in 0.1's
+	write_byte(1)	//life in 0.1's
+	write_byte(16)	//line width in 0.1's
+	write_byte(10)	//noise amplitude in 0.01's
+	write_byte(224)	//r
+	write_byte(255)	//g
+	write_byte(255)	//b
+	write_byte(255)	//brightness
+	write_byte(0)	//scroll speed in 0.1's
+	message_end()

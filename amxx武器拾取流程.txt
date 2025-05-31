@@ -1,0 +1,216 @@
+Touch->AddPlayerItem->
+AddDuplicate(不可挂钩)->
+ExtractAmmo->GiveAmmo->SendMsg_AmmoPickup->EmitSound->
+ExtractClipAmmo->GiveAmmo->SendMsg_AmmoPickup->
+AddToPlayer->AddWeapon->道具AddToPlayer->SendMsg_WeapPickup->
+CanDeploy->CanHolster->
+CanDeploy->g_engfuncs.pfnCrosshairAngle->Holster->Deploy->CanDeploy->ResetMaxSpeed->
+AttachToPlayer
+
+bool 切换武器(玩家, 武器)
+{
+	if (!CanDeploy(武器)) return false;
+	
+	if (玩家.m_vecAutoAim != [0f, 0f]) 玩家.m_vecAutoAim = [0f, 0f], g_engfuncs.pfnCrosshairAngle(玩家, 0f, 0f);
+	玩家.m_fOnTarget = false;
+	
+	if (玩家.m_pActiveItem) Holster(玩家.m_pActiveItem, .skiplocal = 0);
+
+	CBasePlayerItem *pTemp = 玩家.m_pActiveItem;
+	玩家.m_pActiveItem = 武器;
+	玩家.m_pLastItem = pTemp;
+	Deploy(武器);
+
+	if (pWeapon.m_pPlayer) ResetMaxSpeed(pWeapon.m_pPlayer);
+	if (玩家.有盾) 玩家.m_iHideHUD &= ~HIDEHUD_CROSSHAIR;
+	return true;
+}
+Touch(武器盒, 玩家)
+{
+	if (武器盒.在空中) return;
+	if (玩家.不是玩家) return;
+	if (玩家.是死的) return;
+	if (玩家.是vip || 玩家.有盾) return;
+	
+	foreach(CBasePlayerItem 武器 in 武器盒.遍历每个武器槽元素())
+	{
+		if (玩家已有主副武器 && 武器属于主副武器) continue;
+		if (玩家有盾 && 武器属于主武器) continue;
+		if (AddPlayerItem(玩家, 武器) == true) AttachToPlayer(武器, 玩家);
+	}
+	foreach (int 槽索引 in 武器盒.遍历每个子弹槽())
+	{
+		if (武器盒.子弹槽[槽索引].名称 is null) continue;
+		if (武器盒.子弹槽[槽索引].数量 > 0)
+			GiveAmmo(玩家, 武器盒.子弹槽[槽索引].数量, 武器盒.子弹槽[槽索引].名称, 取最大备用弹量(武器盒.子弹槽[槽索引].名称));
+		
+		武器盒.子弹槽[槽索引].名称 = null;
+		武器盒.子弹槽[槽索引].数量 = 0;
+	}
+	...
+}
+Touch(武器, 玩家)
+{
+	if (玩家.不是玩家) return;
+	if (玩家.是vip && 武器.不是usp && 武器.不是格洛克18 && 武器.不是P228 && 武器.不是沙鹰 && 武器.不是刀子) return;
+	if (游戏规则.不能有武器(玩家, 武器)) return;
+	if (AddPlayerItem(玩家, 武器) == true) AttachToPlayer(武器, 玩家);
+}
+bool AddPlayerItem(玩家, 武器)
+{
+	foreach (CBasePlayerItem 已有武器 in 玩家.遍历每个武器槽元素())
+	{
+		if (已有武器.类名 != 武器.类名) continue;
+		if (AddDuplicate(武器, 已有武器)) 武器.设置思考函数(下次思考时删除);
+		return false;
+	}
+	if (AddToPlayer(武器, 玩家) == true)
+	{
+		if (武器.武器槽编号 == 主武器槽编号) 玩家.有主武器 = true;
+		武器.m_pNext = 玩家.武器槽[武器.武器槽编号];
+		玩家.武器槽[武器.武器槽编号] = 武器;
+		if (玩家.有盾()) 玩家.pev.gamestate = 挨打盒组_盾_开启;
+		if (需要切换武器(玩家, 武器) && 玩家.持盾 == false) 切换武器(玩家, 武器);
+		return true;
+	}
+	return false;
+}
+bool AddDuplicate(武器, 已有武器) => 武器.m_iDefaultAmmo && ExtractAmmo(武器, 已有武器) || !!ExtractClipAmmo(武器, 已有武器);
+bool ExtractAmmo(武器, 已有武器)
+{
+	bool res;
+	if (武器.pszAmmo1())
+	{
+		res = 添加主武器子弹(已有武器, 武器.m_iDefaultAmmo, 武器.pszAmmo1(), 武器.iMaxClip(), 武器.iMaxAmmo1());
+		武器.m_iDefaultAmmo = 0;
+	}
+	if (武器.pszAmmo2()) res = 添加副武器子弹(已有武器, 0, 武器.pszAmmo2(), 武器.iMaxAmmo2());
+	return res;
+}
+int ExtractClipAmmo(武器, 已有武器)
+{
+	int iAmmo = 武器.m_iClip == WEAPON_NOCLIP ? 0 : 武器.m_iClip;
+	return GiveAmmo(已有武器.m_pPlayer, iAmmo, 武器.pszAmmo1(), 武器.iMaxAmmo1());
+}
+bool 添加主武器子弹(武器, 弹药量, 弹药品名[], 弹匣最大弹量, 最大备用弹量)
+{
+	int 弹药品种id;
+
+	if (弹匣最大弹量 < 1)
+	{
+		武器.m_iClip = WEAPON_NOCLIP;
+		弹药品种id = GiveAmmo(武器.m_pPlayer, 弹药量, 弹药品名, 最大备用弹量);
+	}
+	else if (m_iClip == 0)
+	{
+		int i = Q_min(m_iClip + 弹药量, 弹匣最大弹量);
+		武器.m_iClip += i;
+
+		弹药品种id = GiveAmmo(武器.m_pPlayer, 弹药量 - i, 弹药品名, 最大备用弹量);
+	}
+	else	弹药品种id = GiveAmmo(武器.m_pPlayer, 弹药量, 弹药品名, 最大备用弹量);
+	
+	if (弹药品种id > 0)
+	{
+		武器.m_iPrimaryAmmoType = 弹药品种id;
+		if (武器.m_pPlayer.遍历武器槽拥有此武器(武器)) EMIT_SOUND(武器, CHAN_ITEM, "items/9mmclip1.wav", VOL_NORM, ATTN_NORM);
+	}
+	return 0 < 弹药品种id;
+}
+bool 添加副武器子弹(武器, 弹药量, 弹药品名[], 最大备用弹量)
+{
+	int 弹药品种id = GiveAmmo(武器.m_pPlayer, 弹药量, 弹药品名, 最大备用弹量);
+	if (弹药品种id > 0)
+	{
+		武器.m_iSecondaryAmmoType = 弹药品种id;
+		EMIT_SOUND(ENT(pev), CHAN_ITEM, "items/9mmclip1.wav", VOL_NORM, ATTN_NORM);
+	}
+	return 0 < 弹药品种id;
+}
+int GiveAmmo(玩家, 弹药量, const 弹药品名[], 最大备用弹量)
+{
+	if (玩家.pev.flags & FL_SPECTATOR) return -1;
+	if (!弹药品名[0]) return -1;
+
+	if (最大备用弹量 == -1) 最大备用弹量 = 取最大备用弹量(弹药品名);
+
+	int 弹药品种索引 = 玩家.寻找弹药品种索引(弹药品名);
+	if (弹药品种索引 < 0 || 最大备用弹量 <= 玩家.m_rgAmmo[弹药品种索引]) return -1;
+
+	const MAX_AMMO_SLOTS = 32;
+	if (MAX_AMMO_SLOTS <= 弹药品种索引) return -1;
+
+	int iAdd = Q_min(弹药量, 最大备用弹量 - 玩家.m_rgAmmo[弹药品种索引]);
+	if (iAdd < 1) return 弹药品种索引;
+
+	m_rgAmmo[弹药品种索引] += iAdd;
+
+	if (gMsgId_AmmoPickup) SendMsg_AmmoPickup(玩家, 弹药品种索引, iAdd);
+
+	// 从m_rgAmmo弹药槽复制到pdata私有属性(ammo_duckshot, ammo_9mm, ammo_556nato等等)
+	更新玩家所有枪支弹药数量();
+	return 弹药品种索引;
+}
+bool AddToPlayer(武器, 玩家)
+{
+	武器.m_pPlayer = 玩家;
+	玩家.pev.weapons |= (1 << 武器.m_iId);
+	if (武器.主弹药 == 0) 武器.主弹药 = 玩家.GetAmmoIndex(武器.pszAmmo1());
+	return AddWeapon(武器) && 道具AddToPlayer(武器, 玩家);
+}
+int AddWeapon(武器)
+{
+	ExtractAmmo(武器, 武器);
+	return 1;
+}
+bool 道具AddToPlayer(道具, 玩家)
+{
+	道具.m_pPlayer = 玩家;
+	SendMsg_WeapPickup(玩家, 道具.m_iId);
+	return true;
+}
+bool 需要切换武器(玩家, 武器)
+{
+	if (CanDeploy(武器) == false) return false;
+	if (!玩家.m_pActiveItem) return true;
+	if (玩家.自动拔出大威力武器 == false) return false;
+	if (CanHolster(玩家.m_pActiveItem) == false) return false;
+	return 玩家.m_pActiveItem.重量() < 武器.重量;
+}
+AttachToPlayer(武器, 玩家)
+{
+	武器.pev.movetype = MOVETYPE_FOLLOW;
+	武器.pev.solid = SOLID_NOT;
+	武器.pev.aiment = 玩家;
+	武器.pev.effects = EF_NODRAW;
+	武器.pev.modelindex = 0;
+	武器.pev.model = 0;
+	武器.pev.owner = 玩家;
+	武器.pev.nextthink = gpGlobals->time + 0.1f;
+	...
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

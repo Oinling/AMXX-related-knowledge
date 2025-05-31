@@ -1,0 +1,12 @@
+
+
+static UIntDiv(uintValue, intDividend)
+{
+	if (uintValue < 0)
+	{
+		new whatIs = uintValue & cellmax;
+		new whatIs2 = (1 << 30);
+		return whatIs / intDividend + (whatIs2 / intDividend << 1) + (whatIs % intDividend + whatIs2 % intDividend + 1) / intDividend;
+	}
+	return uintValue / intDividend;
+}

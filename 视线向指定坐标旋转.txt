@@ -1,0 +1,132 @@
+﻿
+static AngleVector(const Float:angles[3], Float:vecForward[3])
+{
+	new Float:cp = floatcos(angles[0], degrees);
+	vecForward[0] = cp * floatcos(angles[1], degrees);
+	vecForward[1] = cp * floatsin(angles[1], degrees);
+	vecForward[2] = -floatsin(angles[0], degrees);
+}
+/**
+ * 让视线朝指定坐标旋转(导弹可用此函数)
+ * 
+ * @param origin	导弹摄像机坐标(中心坐标)
+ * @param viewAngles	导弹摄像机角度(通常是pev_v_angle,角度[0]减法抬头,加法低头)
+ * @param goal		目标坐标
+ * @param angles	输出:导弹模型角度(通常是pev_angles,角度[0]减法低头,加法抬头,乘以-1则转换为摄像机角度)
+ * @param angularSpeed	设置旋转多少角度(若视线与目标夹角低于此设定,则直接精确瞄准)
+ *
+ * @return		旋转后,还需旋转多少角度才能精确瞄准目标坐标
+*/
+static Float:AnglesRotateTo(const Float:origin[3], const Float:viewAngles[3], const Float:goal[3], Float:angles[3], Float:angularSpeed = 5.0)
+{
+	new Float:vAim[3], Float:vIdeal[3];
+	AngleVector(viewAngles, vAim);
+	xs_vec_sub(goal, origin, vIdeal);
+	
+	// 求出两向量夹角
+	new Float:lenVIdeal = xs_vec_len(vIdeal);
+	new Float:angDiff = floatacos(floatclamp(xs_vec_dot(vAim, vIdeal) / lenVIdeal, -1.0, 1.0), degrees);
+	
+	// 如果夹角小于等于角速度,直接精确瞄准
+	if (angDiff <= angularSpeed)
+	{
+		// 将向量转换成模型角度
+		vector_to_angle(vIdeal, angles);
+		return 0.0;
+	}
+	// 如果夹角等于180,则朝任意方向旋转指定度数
+	if (angDiff == 180.0)
+	{
+		// 将屏幕角度转换成模型角度
+		angles[0] = -viewAngles[0], angles[1] = viewAngles[1], angles[2] = viewAngles[2];
+		// x或y轴旋转-angularSpeed或angularSpeed度数
+		angles[random(2)] += random(2) ? -angularSpeed : angularSpeed;
+		return floatmax(0.0, 180.0 - angularSpeed);
+	}
+	
+	// 向量A叉乘向量B得到向量C:食指表示向量A,拇指表示向量B,形成一个平面.向量C垂直立在这个平面上.其中向量A是该平面的X轴.向量C是Z轴
+	// 将向量vIdeal视作X轴,求出Z轴向量,再求出Y轴向量
+	new Float:vZ[3], Float:vY[3];
+	xs_vec_cross(vIdeal, vAim, vZ);	// vIdeal作为X轴,与vAim形成平面.得到Z轴向量
+	xs_vec_cross(vZ, vIdeal, vY);	// vZ与vIdeal形成平面,这个平面的Z轴向量等于上一个平面的Y轴向量
+	
+	// 在vIdeal(x轴)和vecY(y轴)和vAim在同一平面上,vAim朝着vIdeal方向旋转指定度数
+	angDiff -= angularSpeed;
+	// 将旋转后的角度转换成2D向量(得到x和y轴长度)
+	new Float:x = floatcos(angDiff, degrees), Float:y = floatsin(angDiff, degrees);
+	
+	// 更改3d向量x轴长度为x
+	xs_vec_mul_scalar(vIdeal, x, vIdeal);
+	xs_vec_div_scalar(vIdeal, lenVIdeal, vIdeal);
+	
+	// 更改3d向量y轴长度为y
+	new Float:lenVecY = xs_vec_len(vY);
+	xs_vec_mul_scalar(vY, y, vY);
+	xs_vec_div_scalar(vY, lenVecY, vY);
+	
+	// x和y轴3d向量相加,计算出vAim旋转后在大世界的实际方向
+	xs_vec_add(vIdeal, vY, vAim);
+	
+	// 将向量转换为模型角度
+	vector_to_angle(vAim, angles);
+	return angDiff;
+}
+/**
+ * 将一个角度朝着一个坐标旋转指定的角度(对npc怪物使用)
+ * 
+ * 参数1:眼睛坐标
+ * 参数2:屏幕角度(角度的[0]减法为上旋,加法为下旋)
+ * 参数3:目标坐标
+ * 参数4:储存计算出来的模型角度(角度的[0]减法为下旋,加法为上旋)
+ * 参数5:指定要旋转多少度.不填则默认为5度
+ * 返回值:还需旋转多少度才能精确瞄准目标坐标
+*/
+static Float:AngleRotateTo(const Float:eyePos[3], const Float:vAngles[3], const Float:goal[3], Float:angles[3], Float:angle = 5.0)
+{
+	new Float:vecIdeal[3], Float:newAngles[3];
+	xs_vec_sub(goal, eyePos, vecIdeal);
+	vector_to_angle(vecIdeal, newAngles);
+	
+	new Float:angDiff = get_angle_differece(vAngles[1], newAngles[1]);
+	if (angDiff <= angle)
+	{
+		angles = newAngles;
+		return 0.0;
+	}
+	
+	angles[0] = newAngles[0];
+	angles[1] = angDiff < get_angle_differece(vAngles[1] + angle, newAngles[1]) ? (vAngles[1] - angle) : (vAngles[1] + angle);
+	angles[2] = 0.0;
+	
+	return angDiff - angle;
+}
+/**
+ * 计算两个角度的夹角度数.
+ * 参数1:角度1
+ * 参数2:角度2
+ * 返回值:两个角度形成的夹角.
+*/
+static Float:get_angle_differece(Float:angle1, Float:angle2)
+{
+	new Float:angDiff = angle2 - angle1;
+	while (angDiff < 0) angDiff += 360.0;
+	while (360.0 <= angDiff) angDiff -= 360.0;
+	if (180.0 < angDiff) angDiff = 360.0 - angDiff;
+	return angDiff;
+}
+/**
+ * 计算原角度需要旋转多少度才能指向目标角度.
+ *
+ * @param originAngle	原角度
+ * @param idealAngle	目标角度
+ *
+ * @return	需要旋转多少度(+表示正向旋转,-表示反向旋转)
+*/
+static Float:GetAngleDifferece2(Float:originAngle, Float:idealAngle)
+{
+	// 计算差值
+	new Float:angDiff = idealAngle - originAngle;
+	// 将差值调整到[-180, 180]范围内,简单的写法是(angDiff+180)%360-180;但amxxpawn不支持浮点数%运算
+	angDiff += 180.0;
+	return angDiff - 360.0 * floatround(angDiff / 360.0, floatround_floor) - 180.0;
+}

@@ -1,0 +1,66 @@
+/**
+ * 判断3D空间中的矩形是否可以被射线命中.
+ *
+ * @param origin		矩形中心坐标
+ * @param angles		矩形面向的角度
+ * @param width		矩形的宽度
+ * @param height		矩形的高度
+ * @param rayStart	射线的起点
+ * @param rayDir		射线的方向(长度为1的向量)
+ * @param hitPoint	返回射线与矩形的交点
+ *
+ * @return		若射线可以命中矩形,则返回true.否则返回false
+ * @error		如果没有引用xs.inc则无法编辑
+ */
+stock bool:is_plane_rayintersect(const Float:origin[3], const Float:angles[3], Float:width, Float:height, const Float:rayStart[3], const Float:rayDir[3], Float:hitPoint[3])
+{
+	new Float:vForw[3], Float:vRight[3], Float:vUp[3], Float:p1[3], Float:p2[3], Float:p3[3]
+	engfunc(EngFunc_AngleVectors, angles, vForw, vRight, vUp)
+	get_point_offset(origin, vForw, vRight, vUp, 0.0, width / 2.0, height / 2.0, p1)
+	get_point_offset(origin, vForw, vRight, vUp, 0.0, -width / 2.0, height / 2.0, p2)
+	get_point_offset(origin, vForw, vRight, vUp, 0.0, -width / 2.0, -height / 2.0, p3)
+	
+	// 根据矩形的三个坐标创建一个无限大的平面
+	new Float:plane[4]
+	xs_plane_3p(plane, p1, p2, p3)
+	if (xs_plane_rayintersect(plane, rayStart, rayDir, hitPoint))
+	{
+		/**
+				矩形右上角视图.CAB三个点画一个三角形.
+				点A为矩形中心,点C为射线与无限大平面的交点.线段AC的距离已知,向量AC与向量AB的夹角(角CAB,简称角A)已知.
+				因此可计算点C与点A的水平距离=线段AB的长度,点C与点A的垂直距离=线段CB的长度.
+				D|	C hitPoint
+			origin	A|______B
+		*/
+		new Float:AC, Float:hitPointDir[3]
+		xs_vec_sub(hitPoint, origin, hitPointDir)
+		AC = vector_length(hitPointDir)				// 获取斜边长度
+		xs_vec_normalize(hitPointDir, hitPointDir)
+		
+		new Float:angCAB = xs_vec_angle(hitPointDir, vRight)	// 获取角A
+		new Float:CB = floatsin(angCAB, degrees) * AC		// 获取对边长度(已知sin(角A) = 对边/斜边,因此 对边 = sin(角A) * 斜边)
+		new Float:AB = floatcos(angCAB, degrees) * AC		// 获取邻边长度(已知cos(角A) = 邻边/斜边,因此 邻边= cos(角A) * 斜边)
+		if (floatabs(AB) <= width / 2.0 && floatabs(CB) <= height / 2.0) return true
+	}
+	return false
+}
+/**
+ * 把坐标自身角度当做参考系进行移动
+ *
+ * @param origin		原点坐标
+ * @param vForw		前向量(原点角度转化的向量,长度必须是1)
+ * @param vRight		右向量(原点角度右转90度后转化的向量,长度必须是1)
+ * @param vUp		顶向量(原点角度抬头90度后转化的向量,长度必须是1)
+ * @param forw		向前移动原点
+ * @param right		向右移动原点
+ * @param up		向上移动原点
+ * @param ret		返回移动原点后得到的坐标
+ *
+ * @noreturn
+ */
+stock get_point_offset(const Float:origin[3], const Float:vForw[3], const Float:vRight[3], const Float:vUp[3], Float:forw, Float:right, Float:up, Float:ret[3])
+{
+	ret[0] = origin[0] + vForw[0] * forw + vRight[0] * right + vUp[0] * up
+	ret[1] = origin[1] + vForw[1] * forw + vRight[1] * right + vUp[1] * up
+	ret[2] = origin[2] + vForw[2] * forw + vRight[2] * right + vUp[2] * up
+}

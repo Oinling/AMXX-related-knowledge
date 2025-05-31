@@ -1,0 +1,55 @@
+
+static gSprId_White;
+public plugin_precache()
+{
+	gSprId_White = precache_model("sprites/white.spr");
+}
+static DrawCircle(const Float:center[], const Float:normal[3], Float:radius, edgeCount, edgeWidth, r, g, b, life, playerEntId)
+{
+	new Float:angles[3];
+	vector_to_angle(normal, angles);
+	angles[0] *= -1.0;
+
+	new Float:vF[3], Float:vR[3], Float:vU[3];
+	engfunc(EngFunc_AngleVectors, angles, vF, vR, vU);
+
+	new Float:angleSpeed = 360.0 / edgeCount;
+	for (new n; n < edgeCount; n++)
+	{
+		new Float:p1x = floatcos(angleSpeed * n, degrees) * radius;
+		new Float:p1y = floatsin(angleSpeed * n, degrees) * radius;
+		new Float:p2x = floatcos(angleSpeed * (n + 1), degrees) * radius;
+		new Float:p2y = floatsin(angleSpeed * (n + 1), degrees) * radius;
+
+		new Float:p1[3], Float:p2[3];
+		for (new axis; axis < 3; axis++)
+		{
+			p1[axis] = center[axis] + vR[axis] * p1x + vU[axis] * p1y;
+			p2[axis] = center[axis] + vR[axis] * p2x + vU[axis] * p2y;
+		}
+		SendMsg_BeamPoints(playerEntId, p1, p2, life, edgeWidth, r, g, b);
+	}
+}
+static SendMsg_BeamPoints(playerEntId, const Float:p1[3], const Float:p2[3], life, width, r, g, b)
+{
+	engfunc(EngFunc_MessageBegin, MSG_ONE_UNRELIABLE, SVC_TEMPENTITY, p2, playerEntId);
+	write_byte(TE_BEAMPOINTS);
+	engfunc(EngFunc_WriteCoord, p1[0]);
+	engfunc(EngFunc_WriteCoord, p1[1]);
+	engfunc(EngFunc_WriteCoord, p1[2]);
+	engfunc(EngFunc_WriteCoord, p2[0]);
+	engfunc(EngFunc_WriteCoord, p2[1]);
+	engfunc(EngFunc_WriteCoord, p2[2]);
+	write_short(gSprId_White);
+	write_byte(0);		//starting frame
+	write_byte(10);		//frame rate in 0.1's
+	write_byte(life);	//life in 0.1's
+	write_byte(width);	//line width in 0.1's
+	write_byte(0);		//noise amplitude in 0.01's
+	write_byte(r);		//r
+	write_byte(g);		//g
+	write_byte(b);		//b
+	write_byte(255);	//brightness
+	write_byte(0);		//scroll speed in 0.1's
+	message_end();
+}

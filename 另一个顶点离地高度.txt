@@ -1,0 +1,13 @@
+斜面\  |     |
+     \ |     |玩家碰撞盒
+      \|     |
+    顶点_____另一顶点
+	\    |
+	 \   |
+	  \  |
+	   \ |
+	斜面\|
+	     地面
+
+new Float:maxHalfWidth = floatsqroot(PLAYER_HALF_WIDTH * PLAYER_HALF_WIDTH * 2.0);
+new Float:maxHeight = floattan(floatacos(polygon[PLG_Normal][2], radian)) * maxHalfWidth + polygon[PLG_Normal][2] * 0.03125;

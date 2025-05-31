@@ -1,0 +1,29 @@
+
+#include <fakemeta>
+
+static m_flLastFired, m_tSneaking;
+
+public plugin_init()
+{
+	register_forward(FM_SetOrigin, "Entity_SetOrigin_Post", 1);
+	
+	#if (AMXX_VERSION_NUM < 183)
+	m_flLastFired = find_ent_data_info("CBasePlayer", "m_flLastFired") / 4;
+	m_tSneaking = find_ent_data_info("CBasePlayer", "m_tSneaking") / 4;
+	#else
+	m_flLastFired = 220;
+	m_tSneaking = 357;
+	#endif
+}
+
+public Entity_SetOrigin_Post(entId, const Float:origin[3])
+{
+	if (!is_user_alive(entId)) return;
+	if (get_pdata_float(entId, m_flLastFired) != -15.0) return;
+	if (get_pdata_float(entId, m_tSneaking) != get_gametime() - 1.0) return;
+	Player_Spawn_Internal(entId);
+}
+
+static Player_Spawn_Internal(playerEntId)
+{
+}

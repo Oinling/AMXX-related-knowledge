@@ -1,0 +1,23 @@
+打开amxmodx-master\amxmodx\msvc12\amxmodx_mm.sln
+右键点击amxxpc项目,点击属性,将平台工具集设为vs2022 v143
+右键点击libpc300项目,点击属性,将平台工具集设为vs2022 v143
+
+打开amxxpc项目的amxxpc.cpp源码,
+搜索并跳转:
+sc32(argc, argv);
+改为:
+getchar();	// 等待用户输入任意字符
+sc32(argc, argv);
+
+右键点击amxxpc项目,点击生成,
+然后将amxmodx-master\compiler\amxxpc\Debug\amxxpc.exe剪切到amxmodx-master\amxmodx\msvc12\Debug
+
+右键点击libpc300项目,点击生成,
+
+拖动任意源码到amxxpc.exe图标上,
+
+在libpc300项目任意源码添加断点,
+
+点击vs→调试→附加到进程→选择amxxpc窗口
+
+切换到amxxpc窗口,按回车,调试成功

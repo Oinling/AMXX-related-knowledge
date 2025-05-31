@@ -1,0 +1,36 @@
+
+#if (!defined(FLOAT_NEGATIVE_INFINITY))
+/// 负无穷
+const Float:FLOAT_NEGATIVE_INFINITY = Float:0b_11111111_10000000_00000000_00000000;
+#endif
+
+/**
+ * 获取射线与平面的交点.
+ *
+ * @param rayStart		射线的起点
+ * @param rayDir		射线的方向(单位向量)
+ * @param planePoint		平面上任意坐标
+ * @param planeNormal		平面面向(单位向量,不影响射线从反面命中)
+ * @param planeRadius		平面半径
+ * @param outIntersection	若返回值不是FLOAT_NEGATIVE_INFINITY,输出交点
+ *
+ * @return	若射线命中平面,返回起点与交点的距离.否则返回FLOAT_NEGATIVE_INFINITY
+ */
+static Float:RayIntersectionPlane(const Float:rayStart[3], const Float:rayDir[3], const Float:planePoint[3], const Float:planeNormal[3], Float:outIntersection[3] = 0.0)
+{
+	new Float:cosA = xs_vec_dot(planeNormal, rayDir);
+	
+	// 射线方向与平面方向形成的夹角几乎等于90度,也就是射线与平面平行,视作无交点
+	if (-0.000001 < cosA < 0.000001) return FLOAT_NEGATIVE_INFINITY;
+	
+	new Float:offsetFromRayStart[3];
+	xs_vec_sub(planePoint, rayStart, offsetFromRayStart);
+	
+	// 命中点在射线起点后方,视作无交点
+	new Float:rayLength = xs_vec_dot(planeNormal, offsetFromRayStart) / cosA;
+	if (rayLength < 0.0) return FLOAT_NEGATIVE_INFINITY;
+	
+	// 计算交点
+	xs_vec_add_scaled(rayStart, rayDir, rayLength, outIntersection);
+	return rayLength;
+}

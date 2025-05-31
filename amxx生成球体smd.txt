@@ -1,0 +1,142 @@
+// 将在以下两个位置创建文件.一个是模型smd,一个是动画smd
+// ...\cstrike\addons\amxmodx\data\sphere.smd
+// ...\cstrike\addons\amxmodx\data\sphere_idle.smd
+stock Sphere_Reference()
+{
+	static const bitmapName[] = "sphere.bmp";	// 贴图文件名称
+	const Float:baseRadius = 16.0;			// 半径
+	const maxFrames = 61;				// 动画帧数.不能低于1.必须是奇数.文件不能超过64kb
+	#assert (maxFrames & 1)
+	const Float:minRadius = 0.0;			// 动画中的最小半径
+	const Float:maxRadius = 256.0;			// 动画中的最大半径
+	
+	new fileHandle, ofs, filePath[128];
+	new yaw, pitch, Float:angles[3];
+	new nodeId, nodeCount, Float:nodeRadians[115][3], Float:nodeNormals[115][3], Float:nodeCoords[115][3];
+	new nodeId1, nodeId2, nodeId3, nodeId4;
+	
+	// ...\cstrike\addons\amxmodx\data\sphere.smd
+	ofs = get_localinfo("amxx_datadir", filePath, charsmax(filePath));
+	formatex(filePath[ofs], charsmax(filePath) - ofs, "\sphere.smd");
+	fileHandle = fopen(filePath, "wt");
+	
+	fputs(fileHandle, "version 1^n");
+	
+	fputs(fileHandle, "nodes^n");		// 节点数据起点
+	// 关节索引 关节名 父关节索引
+	for (nodeId = 0; nodeId < 115; nodeId++) fprintf(fileHandle, "%d ^"joint%d^" %d^n", nodeId, nodeId, nodeId ? 0 : -1);
+	fputs(fileHandle, "end^n");		// 节点数据终点
+	
+	fputs(fileHandle, "skeleton^n");	// 骨骼数据起点
+	fputs(fileHandle, "time 0^n");		// 帧索引
+	// 初始化节点[0~114]的坐标,方向,弧度(M_PI弧度等于180角度)
+	nodeNormals[0][0] = 1.0, nodeCount++;
+	nodeRadians[1][0] = -90.0 * M_PI / 180.0, nodeNormals[1][2] = 1.0, nodeCoords[1][2] = baseRadius, nodeCount++;
+	for (yaw = -900 + 225; yaw < 900; yaw += 225)
+	{
+		for (pitch = 0; pitch < 3600; pitch += 225)
+		{
+			angles[0] = float(yaw) * 0.1;
+			angles[1] = float(pitch) * 0.1;
+			nodeRadians[nodeCount][0] = angles[0] * M_PI / 180.0;
+			nodeRadians[nodeCount][1] = angles[1] * M_PI / 180.0;
+			nodeRadians[nodeCount][2] = 0.0;
+			AngleVector(angles, nodeNormals[nodeCount]);
+			xs_vec_mul_scalar(nodeNormals[nodeCount], baseRadius, nodeCoords[nodeCount]);
+			nodeCount++;
+		}       
+	}
+	nodeRadians[114][0] = 90.0 * M_PI / 180.0, nodeNormals[114][2] = -1.0, nodeCoords[114][2] = -baseRadius, nodeCount++;
+	// 关节索引 坐标x, y, z, 弧度翻滚角, 弧度俯仰角, 弧度偏航角(也可能是方位角)
+	for (nodeId = 0; nodeId < nodeCount; nodeId++)
+	{
+		fprintf(fileHandle, "%d %.6f %.6f %.6f 0.0 %.6f %.6f^n",\
+		nodeId,\
+		nodeCoords[nodeId][0], nodeCoords[nodeId][1], nodeCoords[nodeId][2],\
+		nodeRadians[nodeId][0], nodeRadians[nodeId][1]);
+	}
+	fputs(fileHandle, "end^n");		// 骨骼数据终点
+	
+	fputs(fileHandle, "triangles^n");	// 三角形数据起点
+	for (new meshId, layerId; layerId < 8;)
+	{
+		fprintf(fileHandle, "%s^n", bitmapName);
+		// 关节索引 坐标x y z 法向量x y z uvX uvY
+		#define WriteVertexBase(%0,%1,%2) fprintf(fileHandle, "%d %.6f %.6f %.6f %.6f %.6f %.6f 0.5 0.5^n", %0, %1[0], %1[1], %1[2], %2[0], %2[1], %2[2])
+		#define WriteVertex(%0) WriteVertexBase(%0, nodeCoords[%0], nodeNormals[%0])
+		if (layerId == 0)
+		{
+			nodeId1 = 1;
+			nodeId2 = 2 + meshId;
+			nodeId3 = 2 + (meshId + 1) % 16;
+			WriteVertex(nodeId1), WriteVertex(nodeId2), WriteVertex(nodeId3);
+		}
+		else if (layerId < 7)
+		{
+			nodeId1 = 2 + (layerId - 1) * 16 + meshId;
+			nodeId2 = 2 + (layerId - 1) * 16 + (meshId + 1) % 16;
+			nodeId3 = 2 + layerId * 16 + meshId;
+			nodeId4 = 2 + layerId * 16 + (meshId + 1) % 16;
+			if (layerId & 1 && meshId & 1 || !(layerId & 1) && !(meshId & 1))
+			{
+				WriteVertex(nodeId1), WriteVertex(nodeId3), WriteVertex(nodeId4);
+				fprintf(fileHandle, "%s^n", bitmapName);
+				WriteVertex(nodeId1), WriteVertex(nodeId4), WriteVertex(nodeId2);
+			}
+			else
+			{
+				WriteVertex(nodeId1), WriteVertex(nodeId3), WriteVertex(nodeId2);
+				fprintf(fileHandle, "%s^n", bitmapName);
+				WriteVertex(nodeId3), WriteVertex(nodeId4), WriteVertex(nodeId2);
+			}
+		}
+		else
+		{
+			nodeId1 = 114;
+			nodeId2 = 2 + (layerId - 1) * 16 + meshId;
+			nodeId3 = 2 + (layerId - 1) * 16 + (meshId + 1) % 16;
+			WriteVertex(nodeId1), WriteVertex(nodeId3), WriteVertex(nodeId2);
+		}
+		if (++meshId == 16) meshId = 0, layerId++;
+	}
+	fprintf(fileHandle, "end^n");		// 三角形数据终点
+	fclose(fileHandle);
+	
+	
+	// ...\cstrike\addons\amxmodx\data\sphere_idle.smd
+	ofs = get_localinfo("amxx_datadir", filePath, charsmax(filePath));
+	formatex(filePath[ofs], charsmax(filePath) - ofs, "\sphere_idle.smd");
+	fileHandle = fopen(filePath, "wt");
+	
+	fputs(fileHandle, "version 1^n");
+	
+	fputs(fileHandle, "nodes^n");		// 节点数据起点
+	// 关节索引 关节名 父关节索引
+	for (nodeId = 0; nodeId < 115; nodeId++) fprintf(fileHandle, "%d ^"joint%d^" %d^n", nodeId, nodeId, nodeId ? 0 : -1);
+	fputs(fileHandle, "end^n");		// 节点数据终点
+	
+	fputs(fileHandle, "skeleton^n");	// 骨骼数据起点
+	for (new frameId; frameId < maxFrames; frameId++)
+	{
+		fprintf(fileHandle, "time %d^n", frameId);	// 帧索引
+		// 关节索引 坐标x, y, z, 弧度翻滚角, 弧度俯仰角, 弧度偏航角(也可能是方位角)
+		for (nodeId = 0; nodeId < 115; nodeId++)
+		{
+			if (nodeId) xs_vec_mul_scalar(nodeNormals[nodeId], minRadius + (maxRadius - minRadius) * float(frameId) / float(maxFrames - 1), nodeCoords[nodeId]);
+			else nodeCoords[nodeId] = NULL_VECTOR;
+			fprintf(fileHandle, "%d %.6f %.6f %.6f 0.0 %.6f %.6f^n",\
+			nodeId,\
+			nodeCoords[nodeId][0], nodeCoords[nodeId][1], nodeCoords[nodeId][2],\
+			nodeRadians[nodeId][0], nodeRadians[nodeId][1]);
+		}
+	}
+	fputs(fileHandle, "end^n");		// 骨骼数据终点
+	fclose(fileHandle);
+}
+stock AngleVector(const Float:angles[], Float:vector[])
+{
+	new Float:cp = floatcos(angles[0], degrees);
+	vector[0] = cp * floatcos(angles[1], degrees);
+	vector[1] = cp * floatsin(angles[1], degrees);
+	vector[2] = -floatsin(angles[0], degrees);
+}

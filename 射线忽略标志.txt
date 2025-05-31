@@ -1,0 +1,14 @@
+EngFunc_MoveToOrigin:
+EngFunc_DropToFloor:
+EngFunc_WalkMove:
+EngFunc_TraceMonsterHull:
+若怪物没有FL_MONSTERCLIP,无法击中拥有SOLID_BSP和FL_MONSTERCLIP的实体
+
+IGNORE_MONSTERS:
+无法击中没有SOLID_BSP和MOVETYPE_PUSHSTEP的实体
+
+IGNORE_GLASS:
+无法击中没有kRenderNormal和FL_WORLDBRUSH的实体
+
+IGNORE_MISSILE:
+无意义标志,无实际作用

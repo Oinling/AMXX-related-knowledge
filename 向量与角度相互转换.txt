@@ -1,0 +1,61 @@
+
+stock AngleVector(const Float:angles[], Float:vector[])
+{
+	new Float:cp = floatcos(angles[0], degrees);
+	vector[0] = cp * floatcos(angles[1], degrees);
+	vector[1] = cp * floatsin(angles[1], degrees);
+	vector[2] = -floatsin(angles[0], degrees);
+}
+static AngleVector(const Float:angles[], dirt, Float:vector[])
+{
+	new Float:cp, Float:cy, Float:sy, Float:sp;
+	cp = floatcos(M_PI * angles[0] / 180.0);
+	cy = floatcos(M_PI * angles[1] / 180.0);
+	sy = floatsin(M_PI * angles[1] / 180.0);
+	sp = floatsin(M_PI * angles[0] / 180.0);
+	if (dirt == ANGLEVECTOR_FORWARD)
+	{
+		vector[0] = cp * cy;
+		vector[1] = cp * sy;
+		vector[2] = -sp;
+	}
+	if (dirt == ANGLEVECTOR_RIGHT)
+	{
+		new Float:sr, Float:cr;
+		sr = floatsin(M_PI * angles[2] / 180.0);
+		cr = floatcos(M_PI * angles[2] / 180.0);
+		vector[0] = (-1.0 * sr * sp * cy + -1.0 * cr * -sy);
+		vector[1] = (-1.0 * sr * sp * sy + -1.0 * cr * cy);
+		vector[2] = -1.0 * sr * cp;
+	}
+	if (dirt == ANGLEVECTOR_UP)
+	{
+		new Float:sr, Float:cr;
+		sr = floatsin(M_PI * angles[2] / 180.0);
+		cr = floatcos(M_PI * angles[2] / 180.0);
+		vector[0] = (cr * sp * cy + -sr * -sy);
+		vector[1] = (cr * sp * sy + -sr * cy);
+		vector[2] = cr * cp;
+	}
+}
+stock VectorAngle(const Float:vector[3], Float:angles[3])
+{
+	if (vector[1] == 0.0 && vector[0] == 0.0)
+        {
+		angles[0] = vector[2] > 0.0 ? 90.0 : 270.0
+		angles[1] = 0.0
+		angles[2] = 0.0
+		return
+	}
+	new Float:yaw, Float:pitch, Float:tmp
+	yaw = floatatan2(vector[1], vector[0], degrees)
+	if (yaw < 0.0) yaw += 360
+
+	tmp = floatsqroot(vector[0] * vector[0] + vector[1] * vector[1])
+	pitch = floatatan2(vector[2], tmp, degrees)
+	if (pitch < 0.0) pitch += 360
+	
+	angles[0] = pitch
+	angles[1] = yaw
+	angles[2] = 0.0
+}

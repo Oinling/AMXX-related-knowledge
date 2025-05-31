@@ -1,0 +1,106 @@
+
+#include <amxmodx>
+#include <fakemeta>
+
+enum sPlayerMdlData
+{
+	PMD_Name[32],
+	PMD_Index
+}
+static gMdlDatas[33][sPlayerMdlData];
+static Array:gIndices_ToBeUpdated = Invalid_Array;
+static gFwId_StartFrame_Pre;
+static gFwId_SetClientKeyValue_Pre;
+static gFwId_ClientUserInfoChanged_Pre;
+static gFwId_ClientDisconnect_Pre;
+
+/**
+ * 设置玩家模型.
+ *
+ * @note		此函数使用最少的延迟,以解决短时间大批量更改模型所触发的svc_bad错误.
+ *			amxx1.8.2以上版本可直接使用cs_set_user_model函数,并不会触发svc_bad错误.
+ *
+ * @param playerEntId	玩家的实体索引
+ * @param mdlName	模型文件名称(该名称指向"models/player/mdlName/mdlName.mdl"文件,因此不需要填写.mdl后缀)
+ * @param mdlId		模型文件的缓存索引(来源于precache_model函数或EngFunc_ModelIndex,EngFunc_PrecacheModel等功能),
+ *			填写正确索引令游戏能正确查找模型数据,比如hitbox受击盒,动画索引,骨骼坐标等等.
+ *			若该值小于1,表示保持现状,不做更改.
+ *
+ * @noreturn
+*/
+static
+stock Player_SetModel(playerEntId, const mdlName[], mdlId = 0)
+{
+	copy(gMdlDatas[playerEntId][PMD_Name], charsmax(gMdlDatas[][PMD_Name]), mdlName);
+	gMdlDatas[playerEntId][PMD_Index] = mdlId;
+	Player_UpdateModel(playerEntId);
+}
+
+static
+stock Player_UpdateModel(playerEntId)
+{
+	if (gIndices_ToBeUpdated == Invalid_Array)
+	{
+		gIndices_ToBeUpdated = ArrayCreate();
+		gFwId_StartFrame_Pre = register_forward(FM_StartFrame, "Server_StartFrame_Pre");
+		gFwId_SetClientKeyValue_Pre = register_forward(FM_SetClientKeyValue, "Player_SetKeyValue_Pre");
+		gFwId_ClientUserInfoChanged_Pre = register_forward(FM_ClientUserInfoChanged, "Player_UserInfoChanged_Pre");
+		gFwId_ClientDisconnect_Pre = register_forward(FM_ClientDisconnect, "Player_Disconnect_Pre");
+	}
+	new entIdId;
+	for (entIdId = ArraySize(gIndices_ToBeUpdated); entIdId-- && ArrayGetCell(gIndices_ToBeUpdated, entIdId) != playerEntId;) { }
+	if (entIdId < 0) ArrayPushCell(gIndices_ToBeUpdated, playerEntId);
+}
+
+static
+stock bool:Player_HasModel(playerEntId, const mdlName[] = EOS)
+{
+	return gMdlDatas[playerEntId][PMD_Name][0] && (mdlName[0] == EOS || !equal(gMdlDatas[playerEntId][PMD_Name], mdlName));
+}
+
+public Server_StartFrame_Pre()
+{
+	if (!ArraySize(gIndices_ToBeUpdated))
+	{
+		ArrayDestroy(gIndices_ToBeUpdated);
+		unregister_forward(FM_StartFrame, gFwId_StartFrame_Pre);
+		unregister_forward(FM_SetClientKeyValue, gFwId_SetClientKeyValue_Pre);
+		unregister_forward(FM_ClientUserInfoChanged, gFwId_ClientUserInfoChanged_Pre);
+		unregister_forward(FM_ClientDisconnect, gFwId_ClientDisconnect_Pre);
+		return;
+	}
+	
+	new playerEntId = ArrayGetCell(gIndices_ToBeUpdated, 0);
+	ArrayDeleteItem(gIndices_ToBeUpdated, 0);
+	
+	engfunc(EngFunc_SetClientKeyValue, playerEntId, engfunc(EngFunc_GetInfoKeyBuffer, playerEntId), "model", gMdlDatas[playerEntId][PMD_Name]);
+	if (0 < gMdlDatas[playerEntId][PMD_Index])
+	{
+		const m_modelIndexPlayer = 491;
+		set_pdata_int(playerEntId, m_modelIndexPlayer, gMdlDatas[playerEntId][PMD_Index]);
+	}
+}
+
+public Player_SetKeyValue_Pre(playerEntId, infobufferPtr, key[], value[])
+{
+	return equal(key, "model") && Player_HasModel(playerEntId, value) ? FMRES_SUPERCEDE : FMRES_IGNORED;
+}
+
+public Player_UserInfoChanged_Pre(playerEntId, infobufferPtr)
+{
+	if (Player_HasModel(playerEntId)) Player_UpdateModel(playerEntId);
+}
+
+public Player_Disconnect_Pre(playerEntId)
+{
+	new entId, entIdId;
+	for (entIdId = ArraySize(gIndices_ToBeUpdated); entIdId-- && (entId = ArrayGetCell(gIndices_ToBeUpdated, entIdId)) != playerEntId;) { }
+	if (entIdId < 0) return;
+	ArrayDeleteItem(gIndices_ToBeUpdated, entIdId);
+	gMdlDatas[entId][PMD_Name][0] = EOS;
+}
+
+public plugin_end()
+{
+	if (gIndices_ToBeUpdated != Invalid_Array) ArrayDestroy(gIndices_ToBeUpdated);
+}

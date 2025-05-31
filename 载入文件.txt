@@ -1,0 +1,58 @@
+
+new Array:MapList_FileName, Array:MapList_MapName
+public LoadMapList()
+{
+	new filePath[128]
+	format(filePath, 127, "addons/mapList.sma")
+
+	if (!file_exists(filePath)) return			// 文件不存在
+	
+	new fileIndex = fopen(filePath, "rt")			// 打开文件
+	if (!fileIndex) return					// 打开失败
+	
+	ArrayClear(MapList_FileName)				// 清理旧数据
+	ArrayClear(MapList_MapName)				// 清理旧数据
+	
+	new mapFileName[32], mapName[32]
+	while (!feof(fileIndex))				// 如果未读取完毕则循环
+	{
+		textLength = fgets(fileIndex, szLine, 127)	// 往下提取一行字储存到szLine数组
+		
+		if (szLine[0] != '"') continue			// 如果第一个字不是双引号,忽略
+		
+		iChar = 0
+		for (i = 1; i < textLength; i++)		// 把双引号包裹的内容转录到mapFileName数组
+		{
+			if (szLine[i] == '"') break		// 如果当前字符是双引号,停止转录字符
+			
+			mapFileName[iChar] = szLine[i]
+			iChar++
+			
+			if (iChar == charmax(mapFileName)) break// 如果mapFileName数组已经塞不下了,停止转录字符
+		}
+		
+		// 此地图文件不存在,丢弃这一行
+		if (!file_exists(fmt("maps/%s.bsp", mapFileName))) continue
+		
+		// 查找第三个双引号的索引
+		for (i++; i < textLength && szLines[i] != '"'; i++) { }
+		
+		if (szLines[i] != '"') continue			// 没找到第三个双引号
+		
+		iChar = 0
+		for (i = 1; i < textLength; i++)		// 把双引号包裹的内容转录到mapName数组
+		{
+			if (szLine[i] == '"') break		// 如果当前字符是双引号,停止转录字符
+			
+			mapName[iChar] = szLine[i]
+			iChar++
+			
+			if (iChar == charmax(mapName)) break	// 如果mapName数组已经塞不下了,停止转录字符
+		}
+		
+		ArrayPushArray(MapList_FileName, mapFileName)	// 成功塞入一个地图文件名称
+		ArrayPushArray(MapList_MapName, mapName)	// 成功塞入一个地图名称
+	}
+	
+	fclose(fileIndex)					// 关掉文件
+}

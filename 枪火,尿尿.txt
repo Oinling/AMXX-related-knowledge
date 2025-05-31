@@ -1,0 +1,19 @@
+//落点:玩家向前300速的推力,移动类型为6的实体降落点相差不远
+//纹理:random_num(179,181),白色血液
+//火花颜色5,数量22,基础速度25,随机65
+//TR_vecPlaneNormal
+//5黄,14绿,82白,83紫
+	velocity_by_aim(id, 22, vec)
+	message_begin(MSG_PVS, SVC_TEMPENTITY)
+	write_byte(TE_STREAK_SPLASH)
+	write_coord(floatround(org[0]))
+	write_coord(floatround(org[1]))
+	write_coord(floatround(org[2]))
+	write_coord(floatround(vec[0]))
+	write_coord(floatround(vec[1]))
+	write_coord(floatround(vec[2]))
+	write_byte(82)		//color
+	write_short(5)		//count
+	write_short(15)		//base speed
+	write_short(7)		//random vector
+	message_end()

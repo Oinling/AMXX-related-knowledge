@@ -1,0 +1,46 @@
+
+enum PlayerStates
+{
+	PS_Invalid,		/* 死者,无意义的 */
+	PS_Climbing,		/* 正在爬梯子 */
+	PS_OnGround,		/* 在地上 */
+	PS_OnSteepSlope,	/* 在滑坡上 */
+	PS_Falling		/* 在空中 */
+}
+PlayerStates:Player_CheckState(id)
+{
+	if (!is_user_alive(id)) return PS_Invalid
+	if (pev(id, pev_movetype) == MOVETYPE_FLY) return PS_Climbing
+	
+	new Float:mins[3], Float:origin[3], Float:dest[3]
+	pev(id, pev_mins, mins)
+	pev(id, pev_origin, origin)
+	dest[0] = origin[0]
+	dest[1] = origin[1]
+	dest[2] = origin[2] - 999.0
+	
+	new hull = mins[2] == -18.0 ? HULL_HEAD : HULL_HUMAN
+	engfunc(EngFunc_TraceHull, origin, dest, DONT_IGNORE_MONSTERS, hull, id, 0)
+	
+	new Float:vector[3]
+	get_tr2(0, TR_vecEndPos, vector)
+	if (vector[2] == origin[2])
+	{
+		get_tr2(0, TR_vecPlaneNormal, vector)
+		return vector[2] < 0.7 ? PS_OnSteepSlope : PS_OnGround
+	}
+	return PS_Falling
+}
+public fw_PlayerPreThink(id)
+{
+	if (is_user_alive(id) && pev(id, pev_button) & IN_USE && pev(id, pev_oldbuttons) & IN_USE == 0)
+	{
+		switch (Player_CheckState(id))
+		{
+			case PS_Climbing: client_print(0, print_chat, "[state] 攀爬")
+			case PS_OnGround: client_print(0, print_chat, "[state] 地上")
+			case PS_OnSteepSlope: client_print(0, print_chat, "[state] 滑坡")
+			case PS_Falling: client_print(0, print_chat, "[state] 跌落")
+		}
+	}
+}

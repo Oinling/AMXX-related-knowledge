@@ -1,0 +1,139 @@
+
+public Model_DrawBone(zombieEnt, iBone1, iBone2)
+{
+	new Float:startPos[3], Float:endPos[3]
+	engfunc(EngFunc_GetBonePosition, zombieEnt, iBone1, startPos, 0)
+	engfunc(EngFunc_GetBonePosition, zombieEnt, iBone2, endPos, 0)
+	
+	new Float:origin[3], Float:angles[3]
+	pev(zombieEnt, pev_origin, origin)
+	pev(zombieEnt, pev_angles, angles)
+	
+	startPos[0] -= origin[0]
+	startPos[1] -= origin[1]
+	endPos[0] -= origin[0]
+	endPos[1] -= origin[1]
+	
+	new Float:c, Float:s, Float:x, Float:y
+	c = floatcos(angles[1], degrees)
+	s = floatsin(angles[1], degrees)
+	
+	x = startPos[0]
+	y = startPos[1]
+	startPos[0] = x * c - y * s + origin[0]
+	startPos[1] = y * c + x * s + origin[1]
+	x = endPos[0]
+	y = endPos[1]
+	endPos[0] = x * c - y * s + origin[0]
+	endPos[1] = y * c + x * s + origin[1]
+	
+	SendMsg_BeamPoints(startPos, endPos, 1, 10, 0, 255, 0, 0)
+}
+// 画player.mdl骨骼
+public PlayerModel_DrawBones(playerEnt)
+{
+	Model_DrawBone(playerEnt, 1, 0)
+	Model_DrawBone(playerEnt, 2, 1)
+	Model_DrawBone(playerEnt, 3, 2)
+	Model_DrawBone(playerEnt, 4, 3)
+	Model_DrawBone(playerEnt, 5, 4)
+	Model_DrawBone(playerEnt, 6, 5)
+	Model_DrawBone(playerEnt, 7, 6)
+	Model_DrawBone(playerEnt, 8, 7)
+	Model_DrawBone(playerEnt, 9, 6)
+	Model_DrawBone(playerEnt, 10, 9)
+	Model_DrawBone(playerEnt, 11, 10)
+	Model_DrawBone(playerEnt, 12, 11)
+	Model_DrawBone(playerEnt, 13, 12)
+	Model_DrawBone(playerEnt, 14, 13)
+	Model_DrawBone(playerEnt, 15, 12)
+	Model_DrawBone(playerEnt, 16, 15)
+	Model_DrawBone(playerEnt, 17, 15)
+	Model_DrawBone(playerEnt, 18, 11)
+	Model_DrawBone(playerEnt, 19, 10)
+	Model_DrawBone(playerEnt, 20, 10)
+	Model_DrawBone(playerEnt, 21, 9)
+	Model_DrawBone(playerEnt, 22, 9)
+	Model_DrawBone(playerEnt, 23, 6)
+	Model_DrawBone(playerEnt, 24, 23)
+	Model_DrawBone(playerEnt, 25, 24)
+	Model_DrawBone(playerEnt, 26, 25)
+	Model_DrawBone(playerEnt, 27, 26)
+	Model_DrawBone(playerEnt, 28, 27)
+	Model_DrawBone(playerEnt, 29, 26)
+	Model_DrawBone(playerEnt, 30, 29)
+	Model_DrawBone(playerEnt, 31, 29)
+	Model_DrawBone(playerEnt, 32, 25)
+	Model_DrawBone(playerEnt, 33, 24)
+	Model_DrawBone(playerEnt, 34, 24)
+	Model_DrawBone(playerEnt, 35, 23)
+	Model_DrawBone(playerEnt, 36, 23)
+	Model_DrawBone(playerEnt, 37, 5)
+	Model_DrawBone(playerEnt, 38, 1)
+	Model_DrawBone(playerEnt, 39, 1)
+	Model_DrawBone(playerEnt, 40, 1)
+	Model_DrawBone(playerEnt, 41, 40)
+	Model_DrawBone(playerEnt, 42, 41)
+	Model_DrawBone(playerEnt, 43, 42)
+	Model_DrawBone(playerEnt, 44, 41)
+	Model_DrawBone(playerEnt, 45, 40)
+	Model_DrawBone(playerEnt, 46, 1)
+	Model_DrawBone(playerEnt, 47, 46)
+	Model_DrawBone(playerEnt, 48, 47)
+	Model_DrawBone(playerEnt, 49, 48)
+	Model_DrawBone(playerEnt, 50, 47)
+	Model_DrawBone(playerEnt, 51, 46)
+	Model_DrawBone(playerEnt, 52, 2)
+}
+// 画zombie.mdl骨骼
+public ZombieModel_DrawBones(zombieEnt)
+{
+	Model_DrawBone(zombieEnt, 1, 0)
+	Model_DrawBone(zombieEnt, 2, 1)
+	Model_DrawBone(zombieEnt, 3, 2)
+	Model_DrawBone(zombieEnt, 4, 3)
+	Model_DrawBone(zombieEnt, 5, 1)
+	Model_DrawBone(zombieEnt, 6, 5)
+	Model_DrawBone(zombieEnt, 7, 6)
+	Model_DrawBone(zombieEnt, 8, 1)
+	Model_DrawBone(zombieEnt, 9, 8)
+	Model_DrawBone(zombieEnt, 10, 9)
+	Model_DrawBone(zombieEnt, 11, 10)
+	Model_DrawBone(zombieEnt, 12, 11)
+	Model_DrawBone(zombieEnt, 13, 12)
+	Model_DrawBone(zombieEnt, 14, 12)
+	Model_DrawBone(zombieEnt, 15, 14)
+	Model_DrawBone(zombieEnt, 16, 15)
+	Model_DrawBone(zombieEnt, 17, 16)
+	Model_DrawBone(zombieEnt, 18, 17)
+	Model_DrawBone(zombieEnt, 19, 18)
+	Model_DrawBone(zombieEnt, 20, 19)
+	Model_DrawBone(zombieEnt, 21, 17)
+	Model_DrawBone(zombieEnt, 22, 21)
+	Model_DrawBone(zombieEnt, 23, 22)
+	Model_DrawBone(zombieEnt, 24, 17)
+	Model_DrawBone(zombieEnt, 25, 24)
+	Model_DrawBone(zombieEnt, 26, 25)
+	Model_DrawBone(zombieEnt, 27, 17)
+	Model_DrawBone(zombieEnt, 28, 27)
+	Model_DrawBone(zombieEnt, 29, 28)
+	Model_DrawBone(zombieEnt, 30, 12)
+	Model_DrawBone(zombieEnt, 31, 30)
+	Model_DrawBone(zombieEnt, 32, 31)
+	Model_DrawBone(zombieEnt, 33, 32)
+	Model_DrawBone(zombieEnt, 34, 33)
+	Model_DrawBone(zombieEnt, 35, 34)
+	Model_DrawBone(zombieEnt, 36, 35)
+	Model_DrawBone(zombieEnt, 37, 33)
+	Model_DrawBone(zombieEnt, 38, 37)
+	Model_DrawBone(zombieEnt, 39, 38)
+	Model_DrawBone(zombieEnt, 40, 33)
+	Model_DrawBone(zombieEnt, 41, 40)
+	Model_DrawBone(zombieEnt, 42, 41)
+	Model_DrawBone(zombieEnt, 43, 33)
+	Model_DrawBone(zombieEnt, 44, 43)
+	Model_DrawBone(zombieEnt, 45, 44)
+	Model_DrawBone(zombieEnt, 46, 10)
+	Model_DrawBone(zombieEnt, 47, 10)
+	Model_DrawBone(zombieEnt, 48, 8)
+}

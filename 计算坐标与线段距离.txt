@@ -1,0 +1,16 @@
+static Float:Point_GetDistanceToEdge(const Float:point[], const Float:v1[], const Float:v2[])
+{
+	new Float:vP[3], Float:vF[3];
+	xs_vec_sub(point, v1, vP);
+	xs_vec_sub(v2, v1, vF);
+	xs_vec_normalize(vF, vF);
+	new Float:dot = xs_vec_dot(vP, vF);
+	new Float:projection[3];
+	xs_vec_mul_scalar(vF, dot, projection);
+	new Float:q[3], Float:r[3];
+	xs_vec_add(v1, projection, q);
+	xs_vec_sub(q, v2, r);
+        if (xs_vec_dot(vF, projection) >= 0 && xs_vec_dot(vF, r) <= 0)
+            return xs_vec_distance(point, q);
+        return floatmin(xs_vec_distance(point, v1), xs_vec_distance(point, v2));
+}

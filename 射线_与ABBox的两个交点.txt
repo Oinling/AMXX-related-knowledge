@@ -1,0 +1,118 @@
+Ray:射线
+Axis aligned bounding box:轴对齐包围盒
+/**
+ * 获取射线与轴对齐包围盒的最近交点.如果射线起点在包围盒内部,则交点等于起点.
+ *
+ * @param rayStart	射线的起点坐标
+ * @param rayDir	射线的方向
+ * @param absMin	平面上任意一点的坐标
+ * @param absMax	平面法向量
+ * @param distance	如果有交点,储存射线起点到交点的距离,否则储存0.0
+ * @param rayEnd	如果有交点,储存交点.否则储存{ 0.0, 0.0, 0.0 }
+ *
+ * @return     		有交点则为真,否则为假
+ */
+bool:Ray_GetMinIntersectionInAABBox(const Float:rayStart[3], const Float:rayDir[3], const Float:absMin[3], const Float:absMax[3], &Float:distance, Float:rayEnd[3])
+{
+	// 遍历三视图(在脑海中旋转视图,使当前坐标轴从左指向右方)
+	for (new axisId, otherViewId; axisId < 3; axisId++)
+	{
+		// 射线在当前轴并没有指向左边或右边.忽略当前轴
+		if (rayDir[axisId] == 0.0) continue
+		
+		if (0.0 < rayDir[axisId])	// 射线在当前轴表现为朝右发射
+		{
+			// 起点在右面的右边朝右发射,因此不可能击中盒子
+			if (absMax[axisId] <= rayStart[axisId]) break
+			// 左右面夹起点,忽略当前轴
+			if (absMin[axisId] < rayStart[axisId]) continue
+			/* 起点在左面的左边朝右发射,可以击中左面.
+			把起点到左面的距离当做路程,射线向量当做速度,根据时间=路程/时间,
+			可计算需要把向量放大多少倍才能使起点在当前轴击中盒子 */
+			distance = (absMin[axisId] - rayStart[axisId]) / rayDir[axisId]
+		}
+		else				// 射线在当前轴表现为朝左发射
+		{
+			// 起点在左面的左边朝左发射,因此不可能击中盒子
+			if (rayStart[axisId] <= absMin[axisId]) break
+			// 左右面夹起点,忽略当前轴
+			if (rayStart[axisId] < absMax[axisId]) continue
+			/* 起点在右面的右边朝左发射,可以击中右面.
+			把起点到右面的距离当做路程,射线向量当做速度,根据时间=路程/时间,
+			可计算需要把向量放大多少倍才能使起点在当前轴击中盒子 */
+			distance = (absMax[axisId] - rayStart[axisId]) / rayDir[axisId]
+		}
+		
+		// 射线起点+速度*抵达平面所需时间=交点(注:这个时间等于交点与起点的距离).
+		VecAddScaled(rayStart, rayDir, distance, rayEnd)
+		
+		// 在另外两个视图中,检查交点是否也与盒子相交
+		for (otherAxisId = 0; otherAxisId < 3; otherAxisId++)
+		{
+			if (otherAxisId == axisId) continue
+			if (absMin[otherAxisId] <= rayEnd[otherAxisId] <= absMax[otherAxisId]) continue
+			break
+		}
+		// rayEnd在三个视图都与盒子的左右面有交点,返回真
+		if (otherAxisId == 3) return true
+	}
+	distance = 0.0
+	rayEnd = Float:{ 0.0, 0.0, 0.0 }
+	return false
+}
+/**
+ * 获取射线与轴对齐包围盒的最远交点.
+ *
+ * @param rayStart	射线的起点坐标
+ * @param rayDir	射线的方向
+ * @param absMin	平面上任意一点的坐标
+ * @param absMax	平面法向量
+ * @param distance	如果有交点,储存射线起点到交点的距离,否则储存0.0
+ * @param rayEnd	如果有交点,储存交点.否则储存{ 0.0, 0.0, 0.0 }
+ *
+ * @return     		有交点则为真,否则为假
+ */
+bool:Ray_GetMaxIntersectionInAABBox(const Float:rayStart[3], const Float:rayDir[3], const Float:absMin[3], const Float:absMax[3], &Float:distance, Float:rayEnd[3])
+{
+	// 遍历三视图(在脑海中旋转视图,使当前坐标轴从左指向右方)
+	for (new axisId, otherViewId; axisId < 3; axisId++)
+	{
+		// 射线在当前轴并没有指向左边或右边.忽略当前轴
+		if (rayDir[axisId] == 0.0) continue
+		
+		if (0.0 < rayDir[axisId])	// 射线在当前轴表现为朝右发射
+		{
+			// 起点在右面的右边朝右发射,因此不可能击中盒子
+			if (absMax[axisId] <= rayStart[axisId]) break
+			/* 起点在右面的左边朝右发射,可以击中右面.
+			把起点到右面的距离当做路程,射线向量当做速度,根据时间=路程/时间,
+			可计算需要把向量放大多少倍才能使起点在当前轴击穿盒子 */
+			distance = (absMax[axisId] - rayStart[axisId]) / rayDir[axisId]
+		}
+		else				// 射线在当前轴表现为朝左发射
+		{
+			// 起点在左面的左边朝左发射,因此不可能击中盒子
+			if (rayStart[axisId] <= absMin[axisId]) break
+			/* 起点在左面的右边朝左发射,可以击中左面.
+			把起点到左面的距离当做路程,射线向量当做速度,根据时间=路程/时间,
+			可计算需要把向量放大多少倍才能使起点在当前轴击穿盒子 */
+			distance = (absMin[axisId] - rayStart[axisId]) / rayDir[axisId]
+		}
+		
+		// 射线起点+速度*抵达平面所需时间=交点(注:这个时间等于交点与起点的距离).
+		VecAddScaled(rayStart, rayDir, distance, rayEnd)
+		
+		// 在另外两个视图中,检查交点是否也与盒子相交
+		for (otherAxisId = 0; otherAxisId < 3; otherAxisId++)
+		{
+			if (otherAxisId == axisId) continue
+			if (absMin[otherAxisId] <= rayEnd[otherAxisId] <= absMax[otherAxisId]) continue
+			break
+		}
+		// rayEnd在三个视图都与盒子的左右面有交点,返回真
+		if (otherAxisId == 3) return true
+	}
+	distance = 0.0
+	rayEnd = Float:{ 0.0, 0.0, 0.0 }
+	return false
+}

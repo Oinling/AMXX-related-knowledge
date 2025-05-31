@@ -1,0 +1,6 @@
+USP消音 get_pdata_int(get_pdata_cbase(id,373),74)&1
+GLOCK三连 get_pdata_int(get_pdata_cbase(id,373),74)&2
+M4A1消音 get_pdata_int(get_pdata_cbase(id,373),74)&4
+双枪下一发左手 get_pdata_int(get_pdata_cbase(id,373),74)&8
+FAMAS三连 get_pdata_int(get_pdata_cbase(id,373),74)&16
+护盾防护 get_pdata_int(get_pdata_cbase(id,373),74)&32

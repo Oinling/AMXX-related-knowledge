@@ -1,0 +1,56 @@
+
+
+public plugin_cfg() server_cmd("sv_maxvelocity 99999.0")
+
+
+stock get_aim_origin_vector(iPlayer, Float:forw, Float:right, Float:up, Float:vStart[])
+{
+	new Float:vOrigin[3], Float:vAngle[3], Float:vForward[3], Float:vRight[3], Float:vUp[3]
+	
+	pev(iPlayer, pev_origin, vOrigin)
+	pev(iPlayer, pev_view_ofs, vUp)
+	xs_vec_add(vOrigin, vUp, vOrigin)
+	pev(iPlayer, pev_v_angle, vAngle)
+	
+	angle_vector(vAngle, ANGLEVECTOR_FORWARD, vForward)
+	angle_vector(vAngle, ANGLEVECTOR_RIGHT, vRight)
+	angle_vector(vAngle, ANGLEVECTOR_UP, vUp)
+	
+	vStart[0] = vOrigin[0] + vForward[0] * forw + vRight[0] * right + vUp[0] * up
+	vStart[1] = vOrigin[1] + vForward[1] * forw + vRight[1] * right + vUp[1] * up
+	vStart[2] = vOrigin[2] + vForward[2] * forw + vRight[2] * right + vUp[2] * up
+}
+
+public CreateLineEntity(id, Float:EndPos[3])
+{
+	new ent = engfunc(EngFunc_CreateNamedEntity, engfunc(EngFunc_AllocString,"info_target"))
+	
+	new Float:start[3], Float:vec[3]
+	get_aim_origin_vector(id, 0.0, 7.0, -6.0, start)
+	xs_vec_sub(EndPos, start, vec)
+	xs_vec_normalize(vec, vec)
+	xs_vec_mul_scalar(vec, 8000.0, vec)
+	
+	set_pev(ent, pev_origin, start)
+	set_pev(ent, pev_velocity, vec)
+	
+	set_pev(ent, pev_classname, "bullet_trace")
+	set_pev(ent, pev_solid, 1)
+	set_pev(ent, pev_movetype, 5)
+	set_pev(ent, pev_owner, id)
+	set_pev(ent, pev_modelindex, laserSpr)
+	set_pev(ent, pev_renderamt, 0.0)
+	set_pev(ent, pev_rendermode, 4)
+	
+	message_begin(MSG_BROADCAST, SVC_TEMPENTITY)
+	write_byte(TE_BEAMFOLLOW)
+	write_short(ent)
+	write_short(laserSpr)
+	write_byte(1)//³¤
+	write_byte(1)//¿í
+	write_byte(0)//ºì
+	write_byte(random_num(128, 255))//ÂÌ
+	write_byte(255)//À¶
+	write_byte(random_num(64, 255))//ÁÁ¶È
+	message_end()
+}

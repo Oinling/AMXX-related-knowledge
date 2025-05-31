@@ -1,0 +1,31 @@
+HULL_POINT尺寸=0
+HULL_HUMAN尺寸=[-16 -16 -36][16 16 36]
+HULL_LARGE尺寸=[-32 -32 -32][32 32 32]
+HULL_HEAD尺寸=[-16 -16 -18][16 16 18]
+
+直立玩家尺寸=HULL_HUMAN
+蹲伏玩家尺寸=HULL_HEAD
+蹲伏玩家虚假尺寸=[-16 -16 -18][16 16 32]	// 玩家A踩玩家B时,玩家B使用虚假尺寸.玩家B钻洞,撞击天花板时,使用HULL_HEAD
+
+TraceHull的HULL_POINT模式与TraceLine没区别.
+
+详情查阅rehlds-master\rehlds\engine\pr_cmds.cpp文件中的PF_traceline_DLL和TraceHull函数定义
+它们皆调用rehlds-master\rehlds\engine\world.cpp文件中的SV_Move函数
+
+TraceMonsterHull同样调用SV_Move函数,但使用实体的mins和maxs属性作为尺寸.
+
+拥有FL_MONSTERCLIP的SOLID_BSP实体,只能其它被拥有FL_MONSTERCLIP的实体撞击.
+以下功能会自动检查实体使用拥有FL_MONSTERCLIP标志:
+EngFunc_TraceMonsterHull:
+EngFunc_MoveToOrigin:
+EngFunc_DropToFloor:
+EngFunc_WalkMove:
+
+TraceMonsterHull函数返回值:	trace.allsolid || trace.fraction != 1.0f;
+
+
+fNoMonsters参数注意事项:
+若等于IGNORE_MISSILE,将射出[-15 -15 -15][15 15 15]尺寸的AABB去撞击FL_MONSTER实体,对于其它实体,保持原尺寸.
+IGNORE_MISSILE不能与其它值相加!
+若包含IGNORE_MONSTERS,无法击中含有FL_MONSTER|FL_FAKECLIENT|FL_CLIENT标志,不是SOLID_BSP,不是MOVETYPE_PUSHSTEP的实体.
+若包含IGNORE_GLASS,只能击中kRenderNormal或FL_WORLDBRUSH实体

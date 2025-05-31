@@ -1,0 +1,52 @@
+
+游戏莫名崩溃:
+	删除所有名字以m_开头的标识符(类对象属性索引),info_target是CPointEntity类型,并未继承CBaseMonster类的属性
+
+实体移动到某些区域会消失:
+	需要设置pev_movetype,否则系统只在玩家看得见实体原先坐标的附近渲染模型.
+
+模型原点在墙壁内,导致整个实体不可见:
+	需要用EngFunc_SetSize设置碰撞盒尺寸,只要碰撞盒露出一丝,就能渲染模型.
+
+设置实体尺寸后,实体依然不挡路:
+	先设置solid,再使用EngFunc_SetSize.
+
+更改solid为SOLID_TRIGGER时游戏崩溃,弹窗"trigger in clipping list":
+	更改solid之后,用EngFunc_SetSize更新实体尺寸
+
+当pev_movetype为MOVETYPE_NOCLIP时,pev_origin闪现在[单机]跟不上其它实体pev_velocity移动:
+	将pev_movetype改为MOVETYPE_FLY
+
+当pev_movetype为MOVETYPE_FLY时,pev_origin闪现在[联机]闪出残影:
+	将pev_movetype改为MOVETYPE_NOCLIP或MOVETYPE_FLYMISSILE
+
+NPC切换动画时抽搐:
+	避免切换pev_movetype
+	避免pev_velocity为0 0 0
+	手动设置pev_frame
+
+NPC落地时动画抽搐:
+	在思考时,捕捉落地瞬间,将pev_velocity[2]改为任意非0值.
+	手动设置pev_frame
+
+调节NPC动画帧率时抽搐:
+	不要调节
+	手动设置pev_frame
+
+NPC的HitBox错位:
+	用pev_controller_*代替pev_angles旋转NPC,可以让HitBox与模型同步转动
+	手动设置pev_frame
+
+NPC在滑坡上不会打滑:
+	将pev_friction设为1.0,pev_health设为大于0.0,若0<地面法向量.Z<=0.7则删除FL_ONGROUND标志
+
+NPC受到攻击时,出现防弹效果:
+	const HITGROUP_SHIELD_ENABLED	= 0;	// 启用盾牌(允许第21个hitbox被射线命中)
+	const HITGROUP_SHIELD_DISABLED	= 1;	// 禁用盾牌(禁止第21个hitbox被射线命中)
+	将pev_gamestate设为HITGROUP_SHIELD_DISABLED
+
+NPC无法走上斜坡和台阶:
+	分析前方障碍物需要获取TR_vecPlaneNormal[2],以下简称vpnZ.
+	vpnZ==0表示障碍物是垂直墙壁(台阶).分析其高度,决定是否能踩踏,跳跃,蹲跳.
+	0<vpnZ<=0.7表示障碍物是滑坡.一般是放弃行走.也可以检测其高度,尝试跳跃,蹲跳跨过.
+	0.7<vpnZ表示障碍物是斜坡.一般是计算出与地面平行的pev_velocity,继续前行.

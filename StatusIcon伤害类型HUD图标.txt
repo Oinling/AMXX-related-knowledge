@@ -1,0 +1,17 @@
+
+dmg_poison
+dmg_bio
+dmg_chem
+dmg_drown
+dmg_gas
+dmg_cold
+dmg_heat
+dmg_rad
+dmg_shock
+	message_begin(MSG_ONE, get_user_msgid("StatusIcon"), {0,0,0}, id)
+	write_byte(1) // status (0=hide, 1=show, 2=flash)
+	write_string("dmg_cold") // sprite name
+	write_byte(0) // red
+	write_byte(50) // green
+	write_byte(255) // blue
+	message_end()

@@ -1,0 +1,46 @@
+
+#include <amxmodx>
+#include <fakemeta>
+#include <hamsandwich>
+
+static m_bIsC4, m_flC4Blow;
+static bool:gC4IsExploding;
+
+public plugin_init()
+{
+	register_plugin("测试", "1.0.0", "偶萤蛉(Oinling)");
+	
+	RegisterHam(Ham_Think, "grenade", "Grenade_Think_Pre");
+	RegisterHam(Ham_Think, "grenade", "Grenade_Think_Post", 1);
+	RegisterHam(Ham_Killed, "player", "Player_Killed_Post", 1, true);
+	
+	m_bIsC4 = find_ent_data_info("CGrenade", "m_bIsC4");
+	m_flC4Blow = find_ent_data_info("CGrenade", "m_flC4Blow") / 4;
+}
+
+// 炸弹思考_前
+public Grenade_Think_Pre(grenadeEntId)
+{
+	if (!pev_valid(grenadeEntId)) return;
+	if (pev(grenadeEntId, pev_solid) == SOLID_NOT) return;
+	if (!get_pdata_bool(grenadeEntId, m_bIsC4, 4)) return;
+	if (get_gametime() < get_pdata_float(grenadeEntId, m_flC4Blow, 4)) return;
+	gC4IsExploding = true;	// c4正在爆炸 = 真
+}
+
+// 炸弹思考_后
+public Grenade_Think_Post(grenadeEntId)
+{
+	if (!pev_valid(grenadeEntId)) return;
+	if (!get_pdata_bool(grenadeEntId, m_bIsC4, 4)) return;
+	if (get_gametime() < get_pdata_float(grenadeEntId, m_flC4Blow, 4)) return;
+	if (pev(grenadeEntId, pev_solid) != SOLID_NOT) return;
+	gC4IsExploding = false;	// c4正在爆炸 = 假
+}
+
+// 玩家被杀_后
+public Player_Killed_Post(killedEntId, killerEntId, bool:shouldGib)
+{
+	if (!gC4IsExploding) return;
+	client_print(0, print_chat, "[AMXX]%n死于c4爆炸.", killedEntId);
+}

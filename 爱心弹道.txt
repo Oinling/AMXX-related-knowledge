@@ -1,0 +1,87 @@
+/* UTF-8 func by www.DT-Club.net */
+
+#include <amxmodx>
+#include <fakemeta>
+#include <xs>
+new gSprId_BlueFlare1;
+public plugin_precache()
+{
+	gSprId_BlueFlare1 = precache_model("sprites/blueflare1.spr");
+}
+public plugin_init()
+{
+	register_plugin("插件测试", "1.0.0", "偶萤蛉(Oinling)");
+	register_forward(FM_PlayerPreThink, "Player_PreThink_Post", 1);
+}
+public Player_PreThink_Post(playerEntId)
+{
+	new buttons = pev(playerEntId, pev_button);
+	new oldButtons = pev(playerEntId, pev_oldbuttons);
+	if (!(oldButtons & IN_USE) && buttons & IN_USE)
+	{
+		new Float:origin[3], Float:dest[3];
+		pev(playerEntId, pev_origin, origin);
+		pev(playerEntId, pev_view_ofs, dest);
+		xs_vec_add(origin, dest, origin);
+		
+		new Float:angles[3], Float:vF[3], Float:vR[3], Float:vU[3];
+		pev(playerEntId, pev_v_angle, angles);
+		engfunc(EngFunc_AngleVectors, angles, vF, vR, vU);
+		
+		new Float:scale = random_float(1.0, 10.0);
+		new Float:length = 1500.0;
+		new Float:velocity[3];
+		VecAddScalar(vF, vR, vU, 8192.0, 0.0, -56.0 * scale, length, velocity);
+		CreateEntity(origin, velocity);
+		VecAddScalar(vF, vR, vU, 8192.0, 0.0, 32.0 * scale, length, velocity);
+		CreateEntity(origin, velocity);
+		for (new count = 2; count--;)
+		{
+			new Float:sign = count ? 1.0 : -1.0;
+			VecAddScalar(vF, vR, vU, 8192.0, 32.0 * sign * scale, -32.0 * scale, length, velocity);
+			CreateEntity(origin, velocity);
+			VecAddScalar(vF, vR, vU, 8192.0, 56.0 * sign * scale, 0.0 * scale, length, velocity);
+			CreateEntity(origin, velocity);
+			VecAddScalar(vF, vR, vU, 8192.0, 48.0 * sign * scale, 32.0 * scale, length, velocity);
+			CreateEntity(origin, velocity);
+			VecAddScalar(vF, vR, vU, 8192.0, 32.0 * sign * scale, 44.0 * scale, length, velocity);
+			CreateEntity(origin, velocity);
+			VecAddScalar(vF, vR, vU, 8192.0, 16.0 * sign * scale, 40.0 * scale, length, velocity);
+			CreateEntity(origin, velocity);
+		}
+	}
+}
+static VecAddScalar(const Float:vF[3], const Float:vR[3], const Float:vU[3], Float:f, Float:r, Float:u, Float:length, Float:velocity[3])
+{
+	for (new axisId = 3; axisId--;) velocity[axisId] = vF[axisId] * f + vR[axisId] * r + vU[axisId] * u;
+	xs_vec_normalize(velocity, velocity);
+	xs_vec_mul_scalar(velocity, length, velocity);
+}
+static CreateEntity(const Float:origin[3], const Float:velocity[3])
+{
+	static strId_InfoTarget;
+	if (!strId_InfoTarget) strId_InfoTarget = engfunc(EngFunc_AllocString, "info_target");
+	
+	static maxEntities;	// 留32个实体槽
+	if (!maxEntities) maxEntities = global_get(glb_maxEntities) - 32;
+	if (maxEntities <= engfunc(EngFunc_NumberOfEntities)) return 0;
+	
+	new entId = engfunc(EngFunc_CreateNamedEntity, strId_InfoTarget);
+	
+	set_pev(entId, pev_solid, SOLID_BBOX);
+	set_pev(entId, pev_movetype, MOVETYPE_NOCLIP);
+	set_pev(entId, pev_modelindex, gSprId_BlueFlare1);
+	set_pev(entId, pev_rendermode, kRenderGlow);
+	set_pev(entId, pev_renderfx, kRenderFxNoDissipation);
+	set_pev(entId, pev_renderamt, 255.0);
+	set_pev(entId, pev_scale, 0.125);
+	set_pev(entId, pev_rendercolor, { 255.0, 255.0, 255.0 });
+	set_pev(entId, pev_origin, origin);
+	set_pev(entId, pev_velocity, velocity);
+	engfunc(EngFunc_SetSize, entId, { -16.0, -16.0, -32.0 }, { 16.0, 16.0, 32.0 });
+	set_task(1.0, "Task_RemoveEntity", entId);
+}
+public Task_RemoveEntity(entId)
+{
+	engfunc(EngFunc_RemoveEntity, entId);
+}

@@ -1,0 +1,490 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Windows.Forms;
+
+namespace 测试用窗体
+{
+	public partial class Form1 : Form
+	{
+		public Form1()
+		{
+			InitializeComponent();
+			// tempdecal.wad 调色板纹理
+			// cached.wad 雷锤纹理
+			// halflife.wad Mipmap纹理
+			// fonts.wad gfx.wad 字体纹理
+			//string wadPath = "C:\\CustomPF\\Steam\\steamapps\\common\\Half-Life\\valve\\tempdecal.wad";
+			string wadPath = "C:\\CustomPF\\Steam\\steamapps\\common\\Half-Life\\cstrike\\cs_dust.wad";
+			string outputDir = "C:\\Users\\Administrator\\Desktop\\textures";
+
+			// Create output directory if it doesn't exist
+			Directory.CreateDirectory(outputDir);
+
+			ExtractWadTextures(wadPath, outputDir);
+		}
+		private void ExtractWadTextures(string wadPath, string outputDir)
+		{
+			using (FileStream fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read))
+			using (BinaryReader reader = new BinaryReader(fs))
+			{
+				// Read WAD header
+				WadFile.WadHeader header = new WadFile.WadHeader
+				{
+					Identification = reader.ReadChars(4),
+					TextureInfoCount = reader.ReadInt32(),
+					FirstTextureInfoOffset = reader.ReadInt32()
+				};
+				// Validate WAD type
+				if (new string(header.Identification) != "WAD3")
+					throw new InvalidDataException("Not a valid WAD3 file");
+
+				// Jump to the first texture info
+				fs.Seek(header.FirstTextureInfoOffset, SeekOrigin.Begin);
+
+				// Read all texture infos
+				WadFile.TextureInfo[] textureInfos = new WadFile.TextureInfo[header.TextureInfoCount];
+				for (int i = 0; i < header.TextureInfoCount; i++)
+				{
+					textureInfos[i] = new WadFile.TextureInfo
+					{
+						DataOffset = reader.ReadInt32(),
+						CompressedSize = reader.ReadInt32(),
+						Size = reader.ReadInt32(),
+						Type = (WadFile.TextureType)reader.ReadByte(),
+						CompressType = reader.ReadByte(),
+						Padding = reader.ReadInt16(),
+						Name = reader.ReadChars(16)
+					};
+				}
+
+				// Process each texture
+				foreach (WadFile.TextureInfo texInfo in textureInfos)
+				{
+					// Skip compressed textures
+					if (texInfo.CompressType != 0)
+					{
+						Console.WriteLine($"texName'{texInfo.Name}' compressedSize = {texInfo.CompressedSize} compressType = {texInfo.CompressType}");
+						continue;
+					}
+
+					// Jump to texture data
+					fs.Seek(texInfo.DataOffset, SeekOrigin.Begin);
+
+					Bitmap bmp = null;
+					string textureName = new string(texInfo.Name).TrimEnd('\0');
+
+					switch (texInfo.Type)
+					{
+						case WadFile.TextureType.ColorPalatte:
+							Console.WriteLine($"读取调色板纹理:{textureName}");
+							bmp = ExtractColorPalatteTexture(reader);
+							break;
+						case WadFile.TextureType.MipTex:
+							Console.WriteLine($"读取Mipmap纹理:{textureName} 压缩后尺寸={texInfo.CompressedSize} 原尺寸={texInfo.Size} 压缩类型={texInfo.CompressType} nDummy={texInfo.Padding}");
+							bmp = ExtractMipTexture(reader);
+							break;
+						case WadFile.TextureType.QPic:
+							Console.WriteLine($"读取雷锤纹理:{textureName}");
+							bmp = ExtractQPicTexture(reader);
+							break;
+						case WadFile.TextureType.Font:
+							Console.WriteLine($"读取字体纹理:{textureName}");
+							bmp = ExtractFontTexture(reader);
+							break;
+					}
+
+					if (bmp != null)
+					{
+						string safeName = string.Join("_", textureName.Split(Path.GetInvalidFileNameChars()));
+						string outputPath = Path.Combine(outputDir, $"{safeName}.bmp");
+						bmp.Save(outputPath, ImageFormat.Bmp);
+						bmp.Dispose();
+					}
+				}
+			}
+		}
+
+		private Bitmap ExtractColorPalatteTexture(BinaryReader reader)
+		{
+			WadFile.Texture_ColorPalatte tex = new WadFile.Texture_ColorPalatte();
+			long startPos = reader.BaseStream.Position;
+			tex.Name = reader.ReadChars(16);
+			reader.BaseStream.Seek(startPos + 16, SeekOrigin.Begin); // 曾遇到一个bug,上一行会读取17个字符.这里强制纠正
+			tex.Width = reader.ReadUInt32();
+			tex.Height = reader.ReadUInt32();
+			tex.Offset = new uint[4];
+			tex.GrayColors = new byte[4][];
+			for (int i = 0; i < 4; i++)
+				tex.Offset[i] = reader.ReadUInt32();
+			for (int i = 0; i < 4; i++)
+				tex.GrayColors[i] = reader.ReadBytes((int)(tex.Width * tex.Height) / (1 << i) / (1 << i));
+
+			tex.ColorCount = reader.ReadInt16();
+
+			tex.Colors = new Color[256];
+			for (int i = 0; i < 256; i++)
+				tex.Colors[i] = Color.FromArgb(reader.ReadByte(), reader.ReadByte(), reader.ReadByte());
+
+			Bitmap bmp = new Bitmap((int)tex.Width, (int)tex.Height, PixelFormat.Format32bppArgb);
+			for (int x = 0, y = 0, i = 0; i < tex.GrayColors[0].Length; i++)
+			{
+				int colorId = tex.GrayColors[0][i];
+				bmp.SetPixel(x, y, Color.FromArgb(tex.Colors[255].R * colorId / 255, tex.Colors[255].G * colorId / 255, tex.Colors[255].B * colorId / 255));
+				if (tex.Width <= ++x)
+				{ x = 0; y++; }
+			}
+			return bmp;
+		}
+
+		private Bitmap ExtractMipTexture(BinaryReader reader)
+		{
+			WadFile.Texture_MipTex tex = new WadFile.Texture_MipTex();
+			long startPos = reader.BaseStream.Position;
+			tex.Name = reader.ReadChars(16);
+			reader.BaseStream.Seek(startPos + 16, SeekOrigin.Begin); // 曾遇到一个bug,上一行会读取17个字符.这里强制纠正
+			tex.Width = reader.ReadUInt32();
+			tex.Height = reader.ReadUInt32();
+			tex.Offset = new uint[4];
+			tex.ColorIndices = new byte[4][];
+			for (int i = 0; i < 4; i++)
+				tex.Offset[i] = reader.ReadUInt32();
+			Console.WriteLine($"{new string(tex.Name).Split('\0')[0]} 宽={tex.Width} 高={tex.Height} 索引数组位置={tex.Offset[0]} {tex.Offset[1]} {tex.Offset[2]} {tex.Offset[3]}");
+			for (int i = 0; i < 4; i++)
+				tex.ColorIndices[i] = reader.ReadBytes((int)(tex.Width * tex.Height) / (1 << i) / (1 << i));
+
+			tex.ColorCount = reader.ReadInt16();
+
+			tex.Colors = new Color[256];
+			for (int i = 0; i < 256; i++)
+				tex.Colors[i] = Color.FromArgb(reader.ReadByte(), reader.ReadByte(), reader.ReadByte());
+
+			Bitmap bmp = new Bitmap((int)tex.Width, (int)tex.Height, PixelFormat.Format32bppArgb);
+			for (int x = 0, y = 0, i = 0; i < tex.ColorIndices[0].Length; i++)
+			{
+				int colorId = tex.ColorIndices[0][i];
+				bmp.SetPixel(x, y, tex.Colors[colorId]);
+				if (tex.Width <= ++x)
+				{ x = 0; y++; }
+			}
+			return bmp;
+		}
+
+		private Bitmap ExtractQPicTexture(BinaryReader reader)
+		{
+			WadFile.Texture_QPic qpic = new WadFile.Texture_QPic
+			{
+				Width = reader.ReadInt32(),
+				Height = reader.ReadInt32(),
+			};
+			qpic.ColorIndices = reader.ReadBytes(qpic.Width * qpic.Height);
+			qpic.ColorCount = reader.ReadInt16();
+
+			qpic.Colors = new Color[256];
+			for (int i = 0; i < 256; i++)
+				qpic.Colors[i] = Color.FromArgb(reader.ReadByte(), reader.ReadByte(), reader.ReadByte());
+
+			Bitmap bmp = new Bitmap(qpic.Width, qpic.Height, PixelFormat.Format32bppArgb);
+			for (int x = 0, y = 0, i = 0; i < qpic.ColorIndices.Length; i++)
+			{
+				int colorId = qpic.ColorIndices[i];
+				bmp.SetPixel(x, y, qpic.Colors[colorId]);
+				if (qpic.Width <= ++x)
+				{ x = 0; y++; }
+			}
+			return bmp;
+		}
+
+		private Bitmap ExtractFontTexture(BinaryReader reader)
+		{
+			WadFile.Texture_Font font = new WadFile.Texture_Font
+			{
+				Width = reader.ReadInt32(),
+				Height = reader.ReadInt32(),
+				RowCount = reader.ReadInt32(),
+				RowHeight = reader.ReadInt32(),
+				CharInfoList = new WadFile.CharInfo[256]
+			};
+			for (int i = 0; i < 256; i++)
+			{
+				font.CharInfoList[i] = new WadFile.CharInfo
+				{
+					PixelIndex = reader.ReadInt16(),
+					CharWidth = reader.ReadInt16()
+				};
+			}
+
+			font.Width = 256;
+			font.ColorIndices = reader.ReadBytes(font.Width * font.Height);
+
+			font.ColorCount = reader.ReadInt16();
+
+			font.Colors = new Color[256];
+			for (int i = 0; i < 256; i++)
+				font.Colors[i] = Color.FromArgb(reader.ReadByte(), reader.ReadByte(), reader.ReadByte());
+
+			Bitmap bmp = new Bitmap(font.Width, font.Height, PixelFormat.Format32bppArgb);
+			for (int x = 0, y = 0, i = 0; i < font.ColorIndices.Length; i++)
+			{
+				int colorId = font.ColorIndices[i];
+				bmp.SetPixel(x, y, font.Colors[colorId]);
+				if (font.Width <= ++x)
+				{ x = 0; y++; }
+			}
+			return bmp;
+		}
+	}
+	public class WadFile
+	{
+		[StructLayout(LayoutKind.Sequential, Pack = 1)]
+		public struct WadHeader
+		{
+			/// <summary>
+			/// 尺寸为4的char数组,并且内容必须等于"WAD3",否则不是我们要解析的wad文件
+			/// </summary>
+			public char[] Identification;
+			/// <summary>
+			/// 纹理信息数量
+			/// </summary>
+			public int TextureInfoCount;
+			/// <summary>
+			/// 第一个纹理信息的位置
+			/// </summary>
+			public int FirstTextureInfoOffset;
+		}
+
+		/// <summary>
+		/// 纹理类型
+		/// </summary>
+		public enum TextureType : byte
+		{
+			/// <summary>
+			/// 调色板纹理
+			/// </summary>
+			ColorPalatte = 0x40,
+			/// <summary>
+			/// quake纹理,它是quake引擎遗留的格式
+			/// </summary>
+			QPic = 0x42,
+			/// <summary>
+			/// mipmap纹理,是最常用的纹理类型,制作地图使用的纹理都是miptex
+			/// </summary>
+			MipTex = 0x43,
+			/// <summary>
+			/// 字体纹理,这种纹理在fonts.wad和gfx.wad里存有.字体纹理用一张图片存储扩展ASCII码中的256个字符,这种格式继承自quake引擎.
+			/// quake引擎字体纹理宽度一般为128像素,而金源引擎中一般为256像素.这些字体纹理似乎也只在WON版半条命中使用
+			/// </summary>
+			Font = 0x46
+		}
+
+		/// <summary>
+		/// 纹理信息
+		/// </summary>
+		[StructLayout(LayoutKind.Sequential, Pack = 1)]
+		public struct TextureInfo
+		{
+			/// <summary>
+			/// 纹理的数据位置
+			/// </summary>
+			public int DataOffset;
+			/// <summary>
+			/// 纹理数据压缩后的大小(无压缩时等于原始大小)
+			/// </summary>
+			public int CompressedSize;
+			/// <summary>
+			/// 原大小:纹理数据的原始大小
+			/// </summary>
+			public int Size;
+			/// <summary>
+			/// 纹理类型,有四种,分别是0x40(color palatte),0x42(qpic),0x43(miptex)和0x46(font)
+			/// </summary>
+			public TextureType Type;
+			/// <summary>
+			/// 压缩类型.和CompressedSize压缩后大小对应,未找到相关资料.大部分软件的处理方法是无压缩,CompressType为0,CompressedSize等于size.若非0建议放弃,跳过这个纹理
+			/// </summary>
+			public byte CompressType;
+			/// <summary>
+			/// 占位:只用于占位,用于字节对齐.
+			/// </summary>
+			public short Padding;
+			/// <summary>
+			/// 纹理名称:ASCII编码字符串.尺寸为16,纹理名称必须以\0符号结束.
+			/// 岩浆纹理名称以!lava开头
+			/// 毒液纹理名称以!slime开头
+			/// 液体纹理名称以!开头
+			/// 透明纹理名称以{开头,其调色板的最后一个颜色代表透明色,一般设置为纯蓝色(#0000FF)
+			/// 随机纹理名称以-N开头,其中N为一个0到9的数字,能被正确渲染的随机纹理,尺寸必须是224*224
+			/// 动画纹理名称以+N开头,其中N为一个0到9的数字
+			/// 切换纹理名称以+A开头,是动画纹理的静止帧,名称后半部分与动画纹理相同
+			/// </summary>
+			public char[] Name;
+		}
+
+		/// <summary>
+		/// 调色板纹理.宽高必须是16倍数
+		/// </summary>
+		[StructLayout(LayoutKind.Sequential, Pack = 1)]
+		public struct Texture_ColorPalatte
+		{
+			/// <summary>
+			/// 纹理名称,16尺寸
+			/// </summary>
+			public char[] Name;
+			/// <summary>
+			/// 宽度
+			/// </summary>
+			public uint Width;
+			/// <summary>
+			/// 高度
+			/// </summary>
+			public uint Height;
+			/// <summary>
+			/// 4个'灰度值数组'的相对位置.绝对位置=当前纹理位置+相对位置.
+			/// </summary>
+			public uint[] Offset;
+			/// <summary>
+			/// 4个灰度值数组,尺寸分别为:宽度*高度 宽度*高度/4 宽度*高度/16 宽度*高度/64
+			/// 数组内储存每个像素的灰度值.
+			/// 如果要绘制黑白图片,像素的颜色=[灰度值, 灰度值, 灰度值]
+			/// 如果要绘制彩色图片.像素的元素=[调色板[255].R*灰度值/255, 调色板[255].G*灰度值/255, 调色板[255].B*灰度值/255]
+			/// </summary>
+			public byte[][] GrayColors;
+			/// <summary>
+			/// 调色板的颜色数量.但实际读取文件,得到的值永远等于256
+			/// </summary>
+			public short ColorCount;
+			/// <summary>
+			/// 调色板(RGB颜色数组),尺寸=256*3.实际上只有最后一个颜色有用,为黑白纹理染色.
+			/// </summary>
+			public Color[] Colors;
+		}
+
+		/// <summary>
+		/// Mipmap纹理.宽高必须是16倍数
+		/// </summary>
+		[StructLayout(LayoutKind.Sequential, Pack = 1)]
+		public struct Texture_MipTex
+		{
+			/// <summary>
+			/// 纹理名称,16尺寸
+			/// </summary>
+			public char[] Name;
+			/// <summary>
+			/// 宽度
+			/// </summary>
+			public uint Width;
+			/// <summary>
+			/// 高度
+			/// </summary>
+			public uint Height;
+			/// <summary>
+			/// 4个'颜色索引数组'的相对位置.绝对位置=当前纹理位置+相对位置.
+			/// </summary>
+			public uint[] Offset;
+			/// <summary>
+			/// 4个byte数组,尺寸分别为: 宽度*高度 宽度*高度/4 宽度*高度/16 宽度*高度/64
+			/// 4个颜色索引数组,数组内储存的颜色索引用于访问调色板
+			/// </summary>
+			public byte[][] ColorIndices;
+			/// <summary>
+			/// 调色板的颜色数量.但实际读取文件,得到的值永远等于256
+			/// </summary>
+			public short ColorCount;
+			/// <summary>
+			/// 调色板(RGB颜色数组),尺寸=256*3
+			/// </summary>
+			public Color[] Colors;
+		}
+
+		/// <summary>
+		/// 雷锤纹理.不约束宽高的简单图像.
+		/// </summary>
+		[StructLayout(LayoutKind.Sequential, Pack = 1)]
+		public struct Texture_QPic
+		{
+			/// <summary>
+			/// 宽度
+			/// </summary>
+			public int Width;
+			/// <summary>
+			/// 高度
+			/// </summary>
+			public int Height;
+			/// <summary>
+			/// 颜色索引数组,尺寸=宽度*高度.数组内储存的颜色索引用于访问调色板
+			/// </summary>
+			public byte[] ColorIndices;
+			/// <summary>
+			/// 调色板的颜色数量.但实际读取文件,得到的值永远等于256
+			/// </summary>
+			public short ColorCount;
+			/// <summary>
+			/// 调色板(RGB颜色数组),尺寸=256*3
+			/// </summary>
+			public Color[] Colors;
+		}
+
+		/// <summary>
+		/// 字体纹理中,单个字符信息
+		/// </summary>
+		[StructLayout(LayoutKind.Sequential, Pack = 1)]
+		public struct CharInfo
+		{
+			/// <summary>
+			/// 字符的首个像素索引.字符坐标=[像素索引%纹理宽度, 像素索引/纹理宽度]
+			/// </summary>
+			public short PixelIndex;
+			/// <summary>
+			/// 字符宽度
+			/// </summary>
+			public short CharWidth;
+		}
+
+		/// <summary>
+		/// 字体纹理包含 256个ASCII字符的图像和字体数据
+		/// </summary>
+		[StructLayout(LayoutKind.Sequential, Pack = 1)]
+		public struct Texture_Font
+		{
+			/// <summary>
+			/// 据说是宽度,但实际读取文件,得到的值等于RowHeight.在金源引擎,真实宽度永远是256.
+			/// </summary>
+			public int Width;
+			/// <summary>
+			/// 高度
+			/// </summary>
+			public int Height;
+			/// <summary>
+			/// 写有字符的行数
+			/// </summary>
+			public int RowCount;
+			/// <summary>
+			/// 每一行的高度
+			/// </summary>
+			public int RowHeight;
+			/// <summary>
+			/// 字符信息数组,尺寸=256个CharInfo.CharInfo尺寸为4
+			/// 每个字符对应一个字符信息,字符数量为256,对应扩展ASCII的256个字符.
+			/// </summary>
+			public CharInfo[] CharInfoList;
+			/// <summary>
+			/// 颜色索引数组,尺寸=宽度*高度.数组内储存的颜色索引用于访问调色板
+			/// </summary>
+			public byte[] ColorIndices;
+			/// <summary>
+			/// 调色板的颜色数量.但实际读取文件,得到的值永远等于256
+			/// </summary>
+			public short ColorCount;
+			/// <summary>
+			/// 调色板(RGB颜色数组),尺寸=256*3
+			/// </summary>
+			public Color[] Colors;
+		}
+	}
+}

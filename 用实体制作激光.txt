@@ -1,0 +1,181 @@
+enum BeamFlags (<<= 1)
+{
+	BF_None		= 0b_0000_0000,	// 普通光束.会自动识别各种spr格式
+	BF_Sine		= 0b_0001_0000,	// 光束化作弹簧形状(HL的egon枪),由noise属性控制弹簧中心宽度
+	BF_Solid,			// 光束不透明
+	BF_ShadeIn,			// 起点暗色.与BF_ShadeOut互斥
+	BF_ShadeOut			// 终点暗色.与BF_ShadeIn互斥
+}
+enum BeamType
+{
+	BT_Points,			// 点对点
+	BT_PointEnt,			// 点对实体
+	BT_Ents,			// 实体对实体
+}
+/**
+ * 创建一个光束实体.
+ *
+ * @note		若返回值非0,必须用Beam_SetFeatures和Beam_SetEndpoints函数设置光束的特殊属性.
+ *
+ * @param spriteAddress	spr文件的缓存索引
+ * @param width		宽度
+ * @param noise		振幅,0至255
+ * @param red		红色浓度,0.0至255.0
+ * @param green		绿色浓度,0.0至255.0
+ * @param blue		蓝色浓度,0.0至255.0
+ * @param brightness	亮度,0.0至255.0
+ *
+ * @return		光束实体索引,或0(实体过多)
+*/
+static Beam_Create(sprCacheId, Float:width, noise = 0, Float:red = 255.0, Float:green = 255.0, Float:blue = 255.0, Float:brightness = 255.0)
+{
+	if (global_get(glb_maxEntities) <= engfunc(EngFunc_NumberOfEntities)) return 0;
+	
+	static strId_InfoTarget;
+	if (!strId_InfoTarget) strId_InfoTarget = engfunc(EngFunc_AllocString, "info_target");
+	
+	new entId = engfunc(EngFunc_CreateNamedEntity, strId_InfoTarget);
+	
+	set_pev(entId, pev_flags, pev(entId, pev_flags) | FL_CUSTOMENTITY);
+	
+	set_pev(entId, pev_scale, 5.0 * width);
+	set_pev(entId, pev_body, noise);
+	
+	new Float:color[3];
+	color[0] = red, color[1] = green, color[2] = blue;
+	set_pev(entId, pev_rendercolor, color);
+	
+	set_pev(entId, pev_renderamt, brightness);
+	set_pev(entId, pev_modelindex, sprCacheId);
+	
+	set_pev(entId, pev_movetype, MOVETYPE_FLY);
+	
+	return entId;
+}
+/**
+ * 设置光束特征.
+ *
+ * @param entId		光束实体索引,来自Beam_Create函数的返回值
+ * @param flags		光束标志,详情参阅BeamFlags枚举的成员
+ * @param type		光束类型,详情成员BeamType枚举的成员
+ *
+ * @noreturn
+ * @error		无效的光束标志,
+ *			无效的光束类型.
+*/
+static bool:Beam_SetFeatures(entId, BeamFlags:flags, BeamType:type)
+{
+	const BeamFlags:validFlags = BF_Sine | BF_Solid | BF_ShadeIn | BF_ShadeOut;
+	if (~validFlags & flags) abort(AMX_ERR_NONE, "Invalid BeamFlags : %d", flags);
+	switch (type)
+	{
+		case BT_Points .. BT_Ents:
+			set_pev(entId, pev_rendermode, _:flags | _:type);
+		default:
+			abort(AMX_ERR_NONE, "Invalid BeamType : %d", type);
+	}
+}
+/**
+ * 设置光束端点.
+ *
+ * @note		当起点位于地图外,或拥有sky纹理的bsp子模型内,光束无法显示.
+ * @note		起点对应图像的顶部.终点对应图像的底部.
+ *
+ * @param entId		光束实体索引,来自Beam_Create函数的返回值
+ * @param type		光束类型,详情成员BeamType枚举的成员
+ * @param ...		可变参数,填写端点(不能是自己).由type参数决定.分别对应以下3种:
+ *			起点坐标,终点坐标
+ *			起点坐标,终点实体索引,终点附件编号
+ *			起点实体索引,起点附件编号,终点实体索引,终点附件编号
+ *			
+ *
+ * @noreturn
+ * @error		无效的光束类型,
+ *			参数数量与光束类型所需不一致.
+*/
+static bool:Beam_SetEndpoints(entId, BeamType:type, const any:...)
+{
+	switch (type)
+	{
+		case BT_Points:
+		{
+			if (numargs() != 4) abort(AMX_ERR_NONE, "The number of arguments must be 4.");
+			new Float:origin[3], Float:dest[3];
+			for (new axisId = 3; axisId--;) origin[axisId] = Float:getarg(2, axisId), dest[axisId] = Float:getarg(3, axisId);
+			set_pev(entId, pev_origin, origin);
+			set_pev(entId, pev_angles, dest);
+		}
+		case BT_PointEnt:
+		{
+			if (numargs() != 5) abort(AMX_ERR_NONE, "The number of arguments must be 5.");
+			new Float:origin[3];
+			for (new axisId = 3; axisId--;) origin[axisId] = Float:getarg(2, axisId);
+			set_pev(entId, pev_origin, origin);
+			new endEntId = getarg(3) & 0x0FFF;
+			set_pev(entId, pev_skin, endEntId | ((getarg(4) & 0b_1111) << 12));
+			set_pev(entId, pev_aiment, endEntId);
+		}
+		case BT_Ents:
+		{
+			if (numargs() != 6) abort(AMX_ERR_NONE, "The number of arguments must be 6.");
+			new startEntId = getarg(2) & 0x0FFF;
+			set_pev(entId, pev_sequence, startEntId | ((getarg(3) & 0b_1111) << 12));
+			set_pev(entId, pev_owner, startEntId);
+			new endEntId = getarg(4) & 0x0FFF;
+			set_pev(entId, pev_skin, endEntId | ((getarg(5) & 0b_1111) << 12));
+			set_pev(entId, pev_aiment, endEntId);
+		}
+		default:
+			abort(AMX_ERR_NONE, "Invalid BeamType : %d", type);
+	}
+}
+/**
+ * 获取光束端点.
+ *
+ * @param entId		光束实体索引,来自Beam_Create函数的返回值
+ * @param type		光束类型,详情成员BeamType枚举的成员
+ * @param ...		输出端点,可变参数.由type参数决定.分别对应以下3种:
+ *			起点坐标,终点坐标
+ *			起点坐标,终点实体索引,终点附件编号
+ *			起点实体索引,起点附件编号,终点实体索引,终点附件编号
+ *
+ * @noreturn
+ * @error		无效的光束类型,
+ *			参数数量与光束类型所需不一致.
+*/
+static bool:Beam_GetEndpoints(entId, BeamType:type, any:...)
+{
+	switch (type)
+	{
+		case BT_Points:
+		{
+			if (numargs() != 4) abort(AMX_ERR_NONE, "The number of arguments must be 4.");
+			new Float:origin[3], Float:dest[3];
+			pev(entId, pev_origin, origin);
+			pev(entId, pev_angles, dest);
+			for (new axisId = 3; axisId--;) setarg(2, axisId, _:origin[axisId]), setarg(3, axisId, _:dest[axisId]);
+		}
+		case BT_PointEnt:
+		{
+			if (numargs() != 5) abort(AMX_ERR_NONE, "The number of arguments must be 5.");
+			new Float:origin[3];
+			pev(entId, pev_origin, origin);
+			for (new axisId = 3; axisId--;) setarg(2, axisId, _:origin[axisId]);
+			new data = pev(entId, pev_skin);
+			setarg(3, 0, data & 0x0FFF);
+			setarg(4, 0, data >>> 12 & 0b_1111);
+		}
+		case BT_Ents:
+		{
+			if (numargs() != 6) abort(AMX_ERR_NONE, "The number of arguments must be 6.");
+			new data = pev(entId, pev_sequence);
+			setarg(2, 0, data & 0x0FFF);
+			setarg(3, 0, data >>> 12 & 0b_1111);
+			data = pev(entId, pev_skin);
+			setarg(4, 0, data & 0x0FFF);
+			setarg(5, 0, data >>> 12 & 0b_1111);
+		}
+		default:
+			abort(AMX_ERR_NONE, "Invalid BeamType : %d", type);
+	}
+}

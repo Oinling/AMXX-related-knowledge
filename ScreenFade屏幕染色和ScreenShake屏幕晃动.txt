@@ -1,0 +1,73 @@
+enum ScreenFadeType
+{
+	// 渐隐
+	SFT_In		= 0b_000,
+	// 渐显		
+	SFT_Out		= 0b_001,
+	// Modulate (don't blend)
+	SFT_Modulate	= 0b_010,
+	// 忽略变色时间参数,保持显示状态
+	SFT_Stayout	= 0b_100,
+}
+
+/**
+* 为指定客户端,以及正在观察他的客户端的屏幕染色.
+*
+* @param clientEntId	客户端的实体索引
+* @param duration	变色持续时间,最大值可能是7.999
+* @param holdTime	不变色持续时间,最大值可能是7.999
+* @param type		决定渐隐还是渐显,详情查阅ScreenFadeType枚举的成员
+* @param red		红色浓度,值域为0~255
+* @param green		绿色浓度,值域为0~255
+* @param blue		蓝色浓度,值域为0~255
+* @param alpha		染色浓度,值域为0~255.值越低,越透明
+*
+* @noreturn
+*/
+static Player_ScreenFade(clientEntId, Float:duration, Float:holdTime, ScreenFadeType:type, red = 0, green = 0, blue = 0, alpha = 255)
+{
+	for (new clEntId = get_maxplayers(); clEntId; clEntId--)
+	{
+		if (!is_user_connected(clEntId)) continue;
+		if (clEntId != clientEntId && pev(clEntId, pev_iuser2) != clientEntId) continue;
+		SendMsg_ScreenFade(clEntId, duration, holdTime, type, red, green, blue, alpha);
+	}
+}
+
+/**
+* 为指定客户端的屏幕染色.
+*
+* @param clientEntId	客户端的实体索引
+* @param duration	变色持续时间,最大值可能是7.999
+* @param holdTime	不变色持续时间,最大值可能是7.999
+* @param type		决定渐隐还是渐显,详情查阅ScreenFadeType枚举的成员
+* @param red		红色浓度,值域为0~255
+* @param green		绿色浓度,值域为0~255
+* @param blue		蓝色浓度,值域为0~255
+* @param alpha		染色浓度,值域为0~255.值越低,越透明
+*
+* @noreturn
+*/
+static SendMsg_ScreenFade(clientEntId, Float:duration, Float:holdTime, ScreenFadeType:type, red = 0, green = 0, blue = 0, alpha = 255)
+{
+	message_begin(MSG_ONE_UNRELIABLE, get_user_msgid("ScreenFade"), .player = clientEntId);
+	write_short(floatround(duration * 4096.0));
+	write_short(floatround(holdTime * 4096.0));
+	write_short(_:type);
+	write_byte(red);
+	write_byte(green);
+	write_byte(blue);
+	write_byte(alpha);
+	message_end();
+}
+// amplitude 振动幅度
+// duration  持续时间
+// frequency 振动频率
+stock SendMsg_ScreenShake(id, Float:amplitude, Float:duration, Float:frequency)
+{
+	message_begin(MSG_ONE, get_user_msgid("ScreenShake"), _, id)
+	write_short(floatround(amplitude * 4096.0))
+	write_short(floatround(duration * 4096.0))
+	write_short(floatround(frequency * 4096.0))
+	message_end()
+}

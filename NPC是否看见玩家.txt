@@ -1,0 +1,68 @@
+
+/**
+ * 打印指定实体潜在可见集内的所有实体的编号和类名.
+ *
+ * @note		潜在可见集内的实体并不一定能被看见
+ *
+ * @param entId		指定实体索引
+ *
+ * @noreturn
+ * @error		实体索引无效时抛出异常
+*/
+PrintAllEntitiesInPVS(entId)
+{
+	static selectedEntId, className[32]
+	selectedEntId = engfunc(EngFunc_EntitiesInPVS, entId)
+	while (entityId)
+	{
+		// 注1:selectedEntId有可能是无效实体,断线玩家,但依然可以获取属性
+		// 注2:selectedEntId有可能是entId
+		pev(selectedEntId, pev_classname, className, 31)
+		server_print("selectedEntId:%d, className:%s", selectedEntId, className)
+		selectedEntId = pev(selectedEntId, pev_chain)
+	}
+}
+
+/**
+ * 找出npc潜在可见集内最近的活人玩家
+ *
+ * @param npcEntId	npc实体索引
+ *
+ * @return		返回0或玩家实体索引
+ * @error		npc实体索引无效时抛出异常
+*/
+NPC_FindNearestPlayer(npcEntId)
+{
+	static selectedEntId, tempEntId, Float:tempDistance, Float:distance, Float:origin[3], Float:dest[3]
+	
+	selectedEntId = 0
+	pev(npcEntId, pev_origin, origin)
+	// 如果要搜索所有实体,用EngFunc_EntitiesInPVS,如果只要搜索玩家,则用EngFunc_FindClientInPVS
+	for (tempEntId = engfunc(EngFunc_FindClientInPVS, npcEntId); tempEntId; tempEntId = pev(tempEntId, pev_chain))
+	{
+		if (tempEntId == npcEntId) continue
+		if (!is_user_alive(tempEntId)) continue
+		
+		pev(tempEntId, pev_origin, dest)
+		tempDistance =	(origin[0] - dest[0]) * (origin[0] - dest[0]) +
+				(origin[1] - dest[1]) * (origin[1] - dest[1]) +
+				(origin[2] - dest[2]) * (origin[2] - dest[2])
+		if (tempDistance < distance || !selectedEntId) { distance = tempDistance; selectedEntId = tempEntId; }
+	}
+	return selectedEntId
+}
+
+/**
+ * 服务器向客户端发送实体更新消息时, FM_AddToFullPack事件用于确定是否应该发送实体状态
+ *  
+ * @param esHandle	是服务器维护的状态信息副本, 它将被发送给客户端
+ * @param entId		是发信者的实体索引, 不一定是有效实体
+ * @param entEdict	是发信者的实体指针, 不一定是有效实体, 在amxx插件中被转换为实体索引
+ * @param hostEdict	是收信者的实体指针, 并且必定是客户端, 在amxx插件中被转换为实体索引
+ * @param hostFlags	如果包含1标志, 则屏蔽pev_flags属性包含FL_SKIPLOCALHOST标志的实体, 由收信者客户端自行预测其状态
+ * @param entIsPlayer	如果发信者是玩家, 则为1, 否则为0
+ * @param pSet		潜在可听集或潜在可见集的指针, 可用engfunc(EngFunc_CheckVisibility, entEdict, pSet)检查hostEdict能否看见entEdict
+ *
+ * @return	如果实体状态信息已填充完毕, 并且将被发送给客户端, 则事件返回值为1, 否则为0, 返回值为0则由客户端自行预测实体状态
+*/
+forward FM_AddToFullPack(esHandle, entId, entEdict, hostEdict, hostFlags, entIsPlayer, pSet)

@@ -1,0 +1,56 @@
+#if (!defined(NaN))
+const Float:NaN = Float:-4194304;
+#endif
+/**
+ * 检查射线是否命中包围盒.
+ *
+ * @note	若射线起点在包围盒内,则命中点等于起点.
+ *
+ * @param rayStart	射线起点
+ * @param rayDir	射线方向
+ * @param boxMin	包围盒最小坐标
+ * @param boxMax	包围盒最大坐标
+ * @param hitPos	输出射线命中点,或NaN坐标(未命中)
+ * @param distance	输出起点到命中点的距离,或NaN(未命中)
+ *
+ * @return		true=命中,false=未命中
+*/
+stock bool:IsRayHitBox(const Float:rayStart[], const Float:rayDir[], const Float:boxMin[], const Float:boxMax[], Float:hitPos[] = { NaN, NaN, NaN }, &Float:distance = NaN)
+{
+	if (boxMin[0] < rayStart[0] < boxMax[0] && boxMin[1] < rayStart[1] < boxMax[1] && boxMin[2] < rayStart[2] < boxMax[2])
+	{
+		xs_vec_copy(rayStart, hitPos);
+		distance = 0.0;
+		return true;
+	}
+	for (new outsideAxisId, axisId = 3; axisId--;)
+	{
+		if (rayStart[axisId] <= boxMin[axisId] && 0.0 < rayDir[axisId])
+		{
+			distance = (boxMin[axisId] - rayStart[axisId]) / rayDir[axisId];
+			xs_vec_add_scaled(rayStart, rayDir, distance, hitPos);
+			for (outsideAxisId = 3; outsideAxisId--;)
+			{
+				if (outsideAxisId == axisId) continue;
+				if (hitPos[outsideAxisId] < boxMin[outsideAxisId]) break;
+				if (boxMax[outsideAxisId] < hitPos[outsideAxisId]) break;
+			}
+			if (outsideAxisId < 0) return true;
+		}
+		if (boxMax[axisId] <= rayStart[axisId] && rayDir[axisId] < 0.0)
+		{
+			distance = (boxMax[axisId] - rayStart[axisId]) / rayDir[axisId];
+			xs_vec_add_scaled(rayStart, rayDir, distance, hitPos);
+			for (outsideAxisId = 3; outsideAxisId--;)
+			{
+				if (outsideAxisId == axisId) continue;
+				if (hitPos[outsideAxisId] < boxMin[outsideAxisId]) break;
+				if (boxMax[outsideAxisId] < hitPos[outsideAxisId]) break;
+			}
+			if (outsideAxisId < 0) return true;
+		}
+	}
+	hitPos[0] = hitPos[1] = hitPos[2] = NaN;
+	distance = NaN;
+	return false;
+}

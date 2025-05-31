@@ -1,0 +1,77 @@
+// 获取玩家骨骼坐标
+public GetBonePosition(id, bone, Float:position[3])
+{
+	static model[128]
+	static Float:origin[3], Float:angles[3]
+	static ent
+	
+	cs_get_user_model(id, model, 127)
+	format(model, 127, "models/player/%s/%s.mdl", model, model)
+	pev(id, pev_origin, origin)
+	pev(id, pev_v_angle, angles)
+	angles[0]=0.0
+	
+	ent = create_entity("info_target")
+	set_pev(ent, pev_origin, origin)
+	set_pev(ent, pev_angles, angles)
+	
+	engfunc(EngFunc_SetModel, ent, model)
+	set_pev(ent, pev_sequence, pev(id,pev_sequence))
+	set_pev(ent, pev_frame, float(pev(id,pev_frame)))
+	set_pev(ent, pev_framerate, float(pev(id,pev_framerate)))
+	set_pev(ent, pev_rendermode, 5)
+	
+	engfunc(EngFunc_GetBonePosition, ent, bone, position, 0)
+	
+	FixAngles(position, origin, angles)
+	
+	engfunc(EngFunc_RemoveEntity, ent)
+}
+
+// 获取玩家附件坐标
+public GetAttachment(id, attachment, Float:position[3])
+{
+	static model[128]
+	static Float:origin[3], Float:angles[3]
+	static ent
+	
+	cs_get_user_model(id, model, 127)
+	format(model, 127, "models/player/%s/%s.mdl", model, model)
+	pev(id, pev_origin, origin)
+	pev(id, pev_v_angle, angles)
+	angles[0]=0.0
+	
+	ent = create_entity("info_target")
+	set_pev(ent, pev_origin, origin)
+	set_pev(ent, pev_angles, angles)
+	
+	engfunc(EngFunc_SetModel, ent, model)
+	set_pev(ent, pev_sequence, pev(id,pev_sequence))
+	set_pev(ent, pev_frame, float(pev(id,pev_frame)))
+	set_pev(ent, pev_framerate, float(pev(id,pev_framerate)))
+	set_pev(ent, pev_rendermode, 5)
+	
+	engfunc(EngFunc_GetAttachment, ent, attachment, position, 0)
+	
+	FixAngles(position, origin, angles)
+	
+	engfunc(EngFunc_RemoveEntity, ent)
+}
+
+public FixAngles(Float:point[3], Float:origin[3], Float:angles[3])
+{
+	point[0] -= origin[0];
+	point[1] -= origin[1];
+	
+	new Float:x, Float:y, Float:c, Float:s;
+	
+	x = point[0];
+	y = point[1];
+	c = floatcos(angles[1], degrees);
+	s = floatsin(angles[1], degrees);
+	point[0] = x * c - y * s;
+	point[1] = y * c + x * s;
+	
+	point[0] += origin[0];
+	point[1] += origin[1];
+}

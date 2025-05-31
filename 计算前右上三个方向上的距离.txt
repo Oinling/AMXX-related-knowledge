@@ -1,0 +1,10 @@
+// 计算目标在摄像机前右上三个方向上的距离
+static GetDirectionComponents(const Float:viewPos[3], const Float:viewAngles[3], const Float:goal[3], &Float:distF, &Float:distR, &Float:distU)
+{
+	new Float:vecIdeal[3], Float:vF[3], Float:vR[3], Float:vU[3];
+	xs_vec_sub(goal, viewPos, vecIdeal);
+	engfunc(EngFunc_AngleVectors, viewAngles, vF, vR, vU);
+	distF = xs_vec_dot(vecIdeal, vF);
+	distR = xs_vec_dot(vecIdeal, vR);
+	distU = xs_vec_dot(vecIdeal, vU);
+}

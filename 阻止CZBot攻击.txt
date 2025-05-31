@@ -1,0 +1,47 @@
+#include <amxmodx.inc>
+#include <fakemeta.inc>
+#include <hamsandwich.inc>
+#include <xs.inc>
+
+#pragma semicolon 1;
+
+static bool:gNotNemey[33];
+
+public plugin_precache()
+{
+	register_plugin("测试1", "1.0.0", "偶萤蛉(Oinling)");
+
+	register_forward(FM_PlayerPreThink, "Player_PreThink_Post", 1);
+	RegisterHam(Ham_FVecInViewCone, "player", "Bot_FVecInViewCone_Pre", 0, true);
+}
+
+public Bot_FVecInViewCone_Pre(botEntId, const Float:pos[3])
+{
+	static blockTime;
+	if (blockTime) { blockTime--; return HAM_SUPERCEDE; }
+
+	if (!is_user_bot(botEntId)) return HAM_IGNORED;
+	// 若因bot追踪目标触发当前事件,返回
+	if (get_ent_data_float(botEntId, "CCSBot", "m_peripheralTimestamp") == get_gametime()) return HAM_IGNORED;
+	for (new Float:origin[3], playerEntId = MaxClients; playerEntId; playerEntId--)
+	{
+		if (!gNotNemey[playerEntId]) continue;
+		pev(playerEntId, pev_origin, origin);
+		if (!xs_vec_equal(origin, pos)) continue;
+		blockTime = 4;	// 设置接下来的4次事件皆需阻止
+		return HAM_SUPERCEDE;
+	}
+	return HAM_IGNORED;
+}
+
+public Player_PreThink_Post(playerEntId)
+{
+	if (!is_user_alive(playerEntId)) return;
+	
+	if (is_user_bot(playerEntId))
+	{
+		new enemyEntId = get_ent_data_entity(playerEntId, "CCSBot", "m_enemy");
+		if (0 <= enemyEntId <= sizeof(gNotNemey) && gNotNemey[enemyEntId]) set_ent_data_entity(playerEntId, "CCSBot", "m_enemy", -1);
+	}
+	else if (pev(playerEntId, pev_button) & ~pev(playerEntId, pev_oldbuttons) & IN_USE) gNotNemey[playerEntId] = !gNotNemey[playerEntId];
+}

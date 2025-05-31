@@ -1,0 +1,116 @@
+/* UTF-8 func by www.DT-Club.net */
+
+#include <amxmodx>
+#include <fakemeta>
+#include <hamsandwich>
+#include <xs>
+
+enum WalkTypes
+{
+	WT_None,
+	WT_Starting,
+	WT_Walking,
+	WT_Stoping
+}
+
+static WalkTypes:gWalkTypes[33] = { WT_None, ... };
+static Float:gNextQueryTime[33];
+static Float:gMaxSpeed[33][3];
+static Float:gMoveSpeedKey[33];
+
+public plugin_init()
+{
+	register_forward(FM_CmdStart, "Player_CmdStart_Pre");
+}
+
+public client_putinserver(playerEntId)
+{
+	if (is_user_bot(playerEntId)) return;
+	gNextQueryTime[playerEntId] = 0.0;
+	gMaxSpeed[playerEntId][0] = 400.0;
+	gMaxSpeed[playerEntId][1] = 400.0;
+	gMaxSpeed[playerEntId][2] = 400.0;
+	gMoveSpeedKey[playerEntId] = 0.52;
+	query_client_cvar(playerEntId, "cl_forwardspeed", "Server_QueryClientCVar", 1, { 0 });
+	query_client_cvar(playerEntId, "cl_backspeed", "Server_QueryClientCVar", 1, { 1 });
+	query_client_cvar(playerEntId, "cl_sidespeed", "Server_QueryClientCVar", 1, { 2 });
+	query_client_cvar(playerEntId, "cl_movespeedkey", "Server_QueryClientCVar", 1, { 3 });
+}
+
+public Server_QueryClientCVar(playerEntId, const cVar[], const value[], const mark[])
+{
+	switch (mark[0])
+	{
+		case 0 .. 2:	gMaxSpeed[playerEntId][mark[0]] = str_to_float(value);
+		case 3:
+		{
+			gMoveSpeedKey[playerEntId] = str_to_float(value);
+			if (gMoveSpeedKey[playerEntId] <= 0.0 || 0.52 < gMoveSpeedKey[playerEntId]) gMoveSpeedKey[playerEntId] = 0.52;
+		}
+	}
+}
+
+public Player_CmdStart_Pre(playerEntId, ucHandle)
+{
+	new Float:gameTime = get_gametime();
+	if (gControllerData[playerEntId][FBCD_NextQueryTime] <= gameTime)
+	{	// 每隔一段时间查询玩家的速度设定.频繁查询会导致玩家可靠通道溢出,离开游戏
+		StructSetProp(gControllerData[playerEntId][FBCD_NextQueryTime], gameTime + random_float(1.0, 60.0));
+		query_client_cvar(playerEntId, "cl_forwardspeed", "Server_QueryClientCVar", 1, { 0 });
+		query_client_cvar(playerEntId, "cl_backspeed", "Server_QueryClientCVar", 1, { 1 });
+		query_client_cvar(playerEntId, "cl_sidespeed", "Server_QueryClientCVar", 1, { 2 });
+		query_client_cvar(playerEntId, "cl_movespeedkey", "Server_QueryClientCVar", 1, { 3 });
+	}
+
+	new Float:forwardSpeed, Float:sideSpeed;
+	get_uc(ucHandle, UC_ForwardMove, forwardSpeed);
+	get_uc(ucHandle, UC_SideMove, sideSpeed);
+	new Float:sqrSpeed = forwardSpeed * forwardSpeed + sideSpeed * sideSpeed;
+	
+	new Float:maxSpeed;
+	pev(playerEntId, pev_maxspeed, maxSpeed);
+	if (maxSpeed * maxSpeed < sqrSpeed)
+	{
+		new Float:maxForwardSpeed;
+		new Float:maxSideSpeed;
+		new buttons = get_uc(ucHandle, UC_Buttons);
+		switch (buttons & (IN_FORWARD | IN_BACK))
+		{
+			case IN_FORWARD | IN_BACK:	maxForwardSpeed = gMaxSpeed[playerEntId][0] - gMaxSpeed[playerEntId][1];
+			case IN_FORWARD:		maxForwardSpeed = gMaxSpeed[playerEntId][0];
+			case IN_BACK:			maxForwardSpeed = gMaxSpeed[playerEntId][1];
+		}
+		switch (buttons & (IN_MOVELEFT | IN_MOVERIGHT))
+		{
+			case IN_MOVELEFT:		maxSideSpeed = gMaxSpeed[playerEntId][2];
+			case IN_MOVERIGHT:		maxSideSpeed = gMaxSpeed[playerEntId][2];
+		}
+		maxSpeed = maxForwardSpeed * maxForwardSpeed + maxSideSpeed * maxSideSpeed;
+		maxSpeed = float(floatround(moveSpeedKey * moveSpeedKey * maxSpeed));
+	}
+	else
+	{
+		if (is_user_bot(playerEntId)) gData[playerEntId][PD_MoveSpeedKey] = 0.4;
+		maxSpeed = float(floatround(moveSpeedKey * moveSpeedKey * maxSpeed * maxSpeed));
+	}
+	// 注意: (0 < 预期速度 <= 步行速度)代表玩家已经按下shift按键,想要进入步行状态.
+	// 蹲伏/游泳/爬梯/击飞/加速跳等外在条件,不会改变这个结果.
+	
+	// 若玩家按着shift和任意移动键(0 < 预期速度 <= 步行速度),登记为开始步行或持续步行状态
+	if (0.0 < sqrSpeed <= maxSpeed)
+		gWalkTypes[playerEntId] = gWalkTypes[playerEntId] == WT_None ? WT_Starting : WT_Walking;
+	// 若玩家在开始步行或持续步行时松开shift或全部移动按键,登记为停止步行状态
+	else if (WT_None < gWalkTypes[playerEntId] < WT_Stoping)
+		gWalkTypes[playerEntId] = WT_Stoping;
+	// 若玩家并未移动,或正在奔跑,或正在停止步行阶段,登记为无步行状态
+	else
+		gWalkTypes[playerEntId] = WT_None;
+	
+	static state@@@;
+	if (gWalkTypes[playerEntId] == WT_Starting)
+		client_print(0, print_chat, "[AMXX][shift]被按下");
+	if (gWalkTypes[playerEntId] == WT_Walking && !state@@@)
+		client_print(0, print_chat, "[AMXX][shift]被按住..."), state@@@ = 1;
+	if (gWalkTypes[playerEntId] == WT_Stoping)
+		client_print(0, print_chat, "[AMXX][shift]被抬起"), state@@@ = 0;
+}

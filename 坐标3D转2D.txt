@@ -1,0 +1,34 @@
+/**
+ * 将3D坐标转换为屏幕2D坐标.
+ *
+ * @note	输出的2D坐标值被约束在0.0~1.0范围内.
+ *
+ * @param aspectRatio	屏幕宽度与高度的比值,即:宽度/高度
+ * @param fieldOfView	摄像机视场角,例如玩家实体的pev_fov属性值
+ * @param viewPos	摄像机坐标,例如玩家实体的pev_origin与pev_view_ofs属性值相加
+ * @param viewAngles	摄像机角度,例如玩家实体的pev_v_angle属性值
+ * @param goal		目标坐标,例如另一名玩家的pev_origin属性值
+ * @param x		转换成功则输出屏幕坐标x值,否则输出0.0
+ * @param y		转换成功则输出屏幕坐标y值,否则输出0.0
+ *
+ * @return	false=目标坐标在摄像机的视场外,无法被观察到.true=转换成功.
+*/
+static bool:Origin_3DTo2D(Float:aspectRatio, Float:fieldOfView, const Float:viewPos[3], const Float:viewAngles[3], const Float:goal[3], &Float:x, &Float:y)
+{
+	new Float:vecIdeal[3], Float:vF[3], Float:vR[3], Float:vU[3];
+	xs_vec_sub(goal, viewPos, vecIdeal);
+	engfunc(EngFunc_AngleVectors, viewAngles, vF, vR, vU);
+
+	new Float:distF = xs_vec_dot(vecIdeal, vF);
+	if (distF <= 0.0) { x = y = 0.0; return false; }
+	
+	new Float:distR = xs_vec_dot(vecIdeal, vR);
+	new Float:distU = -xs_vec_dot(vecIdeal, vU);
+	new Float:halfWidth = floattan(fieldOfView / 2.0, degrees) * distF;
+	new Float:halfHeight = halfWidth / aspectRatio;
+	x = 0.5 + distR / halfWidth / 2.0;
+	y = 0.5 + distU / halfHeight / 2.0;
+	if (0.0 <= x <= 1.0 && 0.0 <= y <= 1.0) return true;
+	x = y = 0.0;
+	return false;
+}

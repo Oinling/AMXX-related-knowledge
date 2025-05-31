@@ -1,0 +1,13 @@
+
+	new ent = engfunc(EngFunc_CreateNamedEntity, engfunc(EngFunc_AllocString, "env_sprite"))
+	
+	set_pev(ent, pev_movetype, MOVETYPE_FOLLOW)	// 移动类型:跟随模式
+	set_pev(ent, pev_aiment, id)			// mdl或spr跟随目标:id
+	set_pev(ent, pev_skin, id)			// spr跟随目标:id	(mdl文件可以没有这个设置,spr文件必须有)
+	set_pev(ent, pev_body, 1)			// 跟随1号附件
+	set_pev(ent, pev_rendermode, kRenderTransAdd)
+	set_pev(ent, pev_renderamt, 255.0)
+	set_pev(ent, pev_framerate, 13.0)
+	engfunc(EngFunc_SetModel, ent, "sprites/xspark1.spr")
+	
+	dllfunc(DLLFunc_Spawn, ent)

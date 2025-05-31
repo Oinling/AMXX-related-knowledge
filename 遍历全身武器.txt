@@ -1,0 +1,31 @@
+
+new ent, classname[18], wpnId, ammo, bpammo
+// 遍历1至5号武器槽
+for (new slot = 1; slot < 6; slot++)
+{
+	// 获取当前武器槽的第一个武器实体索引
+	ent = get_pdata_cbase(id, 367 + slot)
+	
+	LoopStart:
+	pev(ent, pev_classname, classname, 17)
+	wpnId	= get_weaponid(classname)
+	ammo	= cs_get_weapon_ammo(ent)
+	bpammo	= wpnId == CSW_KNIFE ? -1 : cs_get_user_bpammo(id, wpnId)
+	
+	client_print(0, print_chat, "slot:%d, %s(%d):%d, ammo:%d/%d", slot, classname, wpnId, ent, ammo, bpammo)
+	
+	// 获取武器槽中,下一个武器实体索引
+	ent = get_pdata_cbase(ent, 42, 4)
+	if (0 < ent) goto LoopStart
+}
+
+
+Print:
+
+slot:1, weapon_ak47(28):125,		ammo:30/90
+slot:2, weapon_glock18(17):123,		ammo:20/120
+slot:3, weapon_knife(29):122,		ammo:-1/-1
+slot:4, weapon_smokegrenade(9):127,	ammo:-1/1
+slot:4, weapon_hegrenade(4):128,	ammo:-1/1
+slot:4, weapon_flashbang(25):126,	ammo:-1/2
+slot:5, weapon_c4(6):124,		ammo:-1/1

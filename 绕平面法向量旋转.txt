@@ -1,0 +1,18 @@
+
+		if (IsKeyPressing(playerEntId, IN_RELOAD))
+		{
+			new angle, Float:vecNormal[3], Float:angles[3], Float:vX[3], Float:vY[3], Float:vecF[3];
+			angle = pev(entId, pev_iuser1);					// 旋转角度
+			pev(entId, pev_vuser1, vecNormal);				// 地面法向量
+			vector_to_angle(vecNormal, angles), angles[0] *= -1.0;
+			engfunc(EngFunc_AngleVectors, angles, vecNormal, vX, vY);
+			xs_vec_mul_scalar(vX, floatcos(float(angle), degrees), vecF);
+			xs_vec_add_scaled(vecF, vY, floatsin(float(angle), degrees), vecF);
+			vector_to_angle(vecF, angles), angles[0] *= -1.0;
+			
+			angle_vector(angles, ANGLEVECTOR_UP, vY);
+			angle_vector(angles, ANGLEVECTOR_RIGHT, vX);
+			angles[0] *= -1.0, angles[2] = floatatan2(xs_vec_dot(vecNormal, vX), xs_vec_dot(vecNormal, vY), degrees);
+			set_pev(entId, pev_angles, angles);
+			set_pev(entId, pev_iuser1, ++angle % 360);
+		}

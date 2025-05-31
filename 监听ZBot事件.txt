@@ -1,0 +1,55 @@
+#include <amxmodx>
+#include <hamsandwich>
+
+#if 182 < AMXX_VERSION_NUM
+const sizeofInt32 = 4;
+static m_modelIndexPlayer;
+#else
+const m_modelIndexPlayer = 491;
+static gRegId_PlayerPreThink_Pre;
+#endif
+
+public plugin_init()
+{
+	register_plugin("Test 1", "1", "偶萤蛉(Oinling)");
+
+	#if (182 < AMXX_VERSION_NUM)
+	m_modelIndexPlayer = find_ent_data_info("CBasePlayer", "m_modelIndexPlayer") / sizeofInt32;
+	RegisterHam(Ham_Spawn, "player", "Player_Spawn_Post", 1, true);	// 182以上版本,5号参数设为true即可为bot添加ham挂钩
+	#else
+	state (get_cvar_pointer("bot_quota")) WaitForZBot;		// 183以下版本,将插件状态切换到等待zbot模式
+	RegisterHam(Ham_Spawn, "player", "Player_Spawn_Post", 1);	// 这只能为真实玩家添加ham挂钩
+	#endif
+}
+
+#define NeverWaitForZBot
+public client_putinserver(playerEntId) <NeverWaitForZBot> { }		// 不等zbot模式下,玩家进入无事发生
+public client_putinserver(playerEntId) <WaitForZBot>			// 等待zbot模式下,zbot进入,添加思考挂钩
+{
+	if (!gRegId_PlayerPreThink_Pre && is_user_czbot(playerEntId))
+		gRegId_PlayerPreThink_Pre = register_forward(FM_PlayerPreThink, "Player_PreThink_Pre");
+}
+
+public Player_PreThink_Pre(playerEntId)					// 思考挂钩,若是zbot思考,为所有zbot添加ham挂钩,并删除思考挂钩
+{
+	if (!is_user_czbot(playerEntId)) return;
+	RegisterHamFromEntity(Ham_Spawn, playerEntId, "Player_Spawn_Post", 1);
+	unregister_forward(FM_PlayerPreThink, gRegId_PlayerPreThink_Pre);
+}
+
+public Player_Spawn_Post(playerEntId)
+{
+	if (!is_user_alive(playerEntId)) return;
+	get_pdata_int(playerEntId, m_modelIndexPlayer, gModelIndex[playerEntId]);
+}
+
+static bool:is_user_czbot(playerEntId)
+{
+	if (!is_user_bot(playerEntId)) return false;
+	
+	new tracker[2], friends[2], ah[2];
+	get_user_info(playerEntId, "tracker", tracker, 1);
+	get_user_info(playerEntId, "friends", friends, 1);
+	get_user_info(playerEntId, "_ah", ah, 1);
+	return tracker[0] != '0' || friends[0] != '0' || ah[0] != '0';
+}

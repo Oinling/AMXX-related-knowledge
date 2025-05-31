@@ -1,0 +1,24 @@
+
+stock get_pdata_bool(ent, charbased_offset, intbase_linuxdiff=5)
+{
+	return !!(get_pdata_int(ent,charbased_offset/4,intbase_linuxdiff)&(0xFF<<((charbased_offset%4)*8)))
+}
+
+stock set_pdata_char(ent, charbased_offset, value, intbase_linuxdiff=5)
+{
+	value&=0xFF
+	
+	new int_offset_value=get_pdata_int(ent,charbased_offset/4,intbase_linuxdiff)
+	new bit_decal=(charbased_offset%4)*8
+	int_offset_value&=~(0xFF<<bit_decal) // clear byte
+	int_offset_value|=value<<bit_decal
+	
+	set_pdata_int(ent, charbased_offset/4, int_offset_value, intbase_linuxdiff)
+	
+	return 1
+}
+
+stock set_pdata_bool(ent, charbased_offset, bool:value, intbase_linuxdiff=5)
+{ 
+	set_pdata_char(ent, charbased_offset, _:value, intbase_linuxdiff)
+}

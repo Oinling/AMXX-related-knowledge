@@ -1,0 +1,365 @@
+﻿/* 本插件由 AMXX-Studio 中文版自动生成*/
+/* UTF-8 func by www.DT-Club.net */
+
+//武器射击事件的使用范例
+/*
+
+#define flags(%1)	pev(%1,pev_flags)	//自定义函数flags(实体索引),是pev(实体索引,pev_flags)简写
+
+const Float:WpnFireDl=0.09		//几秒射击一次
+
+public plugin_init()
+{
+	register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
+	//注册CmdStart事件,这个函数与玩家思考类似,不管任何时候都在执行
+	register_forward(FM_CmdStart,		"fw_CmdStart")
+}
+
+public fw_CmdStart(id, handle)
+{
+	//条件:id是活人,武器为AK47,下次攻击时间剩余少于0秒
+	if (!is_user_alive(id)) return
+	if (get_user_weapon(id)!=CSW_AK47) return
+	if (get_pdata_float(id,83)>0.0) return
+
+	//定义ent为id的武器AK47,的实体索引
+	new ent=stock_get_wpnid(id,CSW_AK47)	//自定义函数,例子在下面
+	//定义clip为AK47(ent)里面的子弹数
+	new clip=cs_get_weapon_ammo(ent)
+	//定义reload为ent的装子弹状态(54),reload=1则ent处于装子弹状态,=0则不是
+	new reload=get_pdata_int(ent,54,4)
+
+	//条件:若id按E 而且 id按R
+	if (pev(id,pev_button)&IN_USE && pev(id,pev_button)&IN_RELOAD)
+	{
+		//条件:AK47的下次主攻击时间剩余小于0秒,不是装子弹状态
+		if (get_pdata_float(ent,46,4)>0.0) return
+		if (reload) return
+
+		//定义acc为AK47的精准度(62)
+		new Float:acc=get_pdata_float(ent,62,4)
+		//条件:站立/奔跑(速度大于0)/蹲下/其他各种状态下的不同精准度射击
+		if (!(flags(id)&FL_ONGROUND)) weapon_fire(id, ent, acc*0.2, WpnFireDl)
+		else if (stock_get_speed(id)>0) weapon_fire(id, ent, acc*0.125, WpnFireDl)
+		else if (flags(id)&FL_DUCKING) weapon_fire(id, ent, acc*0.05, WpnFireDl)
+		else weapon_fire(id, ent, acc*0.1, wc_atk1atkd)
+		return
+	}
+}
+
+//自定义获取玩家id的武器wpn的实体索引stock_get_wpnid()
+stock stock_get_wpnid(id, wpn)
+{
+	new weapon[32]
+	get_weaponname(wpn, weapon, 31)
+	new ent
+	while ((ent=engfunc(EngFunc_FindEntityByString,ent,"classname",weapon)) && pev(ent,pev_owner)!=id) {}
+	if (!pev_valid(ent)) return 0
+	return ent
+}
+*/
+
+#include <amxmodx>		//必要的inc文件
+#include <cstrike>		//必要的inc文件
+#include <fakemeta>		//必要的inc文件
+#include <hamsandwich>		//必要的inc文件
+#include <xs>			//必要的inc文件
+
+#define PLUGIN_NAME	"武器射击事件备份"
+#define PLUGIN_VERSION	"1.0"
+#define PLUGIN_AUTHOR	"水蛭"
+
+#define flags(%1)	pev(%1,pev_flags)	//自定义函数flags(实体索引),是pev(实体索引,pev_flags)简写
+
+const WpnAnimFireV=1				//射击时V模型播放的动作
+const WpnAnimFireCr=37				//蹲下射击时玩家模型播放的动作
+const WpnAnimFireRef=40				//站立射击时玩家模型播放的动作
+const Float:WpnFireIdle=1.0			//V模型的射击动作播放多长时间(要从V模型里面获取,帧数除以帧率,frame/FPS)
+const Float:WpnFireDist=9999.0			//射击距离
+const Float:WpnFireDmg=26.0			//射击伤害
+
+new const WpnSndFire[][]={"weapons/hks1.wav","weapons/hks2.wav","weapons/hks3.wav"}	//射击声音
+
+const Float:WpnDmgHead=4.0			//爆头伤害倍数
+const Float:WpnDmgChest=2.0			//爆胸伤害倍数
+const Float:WpnDmgStomach=1.25			//爆胃伤害倍数
+const Float:WpnDmgArms=1.0			//爆胳膊伤害倍数
+const Float:WpnDmgLegs=0.85			//爆腿伤害倍数
+
+//记录弹壳模型索引
+new g_shellMdl
+//记录喷血图标,掉血图标索引
+new g_spraySpr, g_dropSpr
+
+//自定义玩家动作的各种数据
+new g_SeqStart[33], g_SeqNum[33], Float:g_SeqFrame[33], Float:g_SeqLife[33], Float:g_SeqCheckTime[33]
+
+public plugin_init()
+{
+	register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
+	//自定义玩家动作在这里执行
+	register_forward(FM_AddToFullPack,		"fw_AddToFullPack")
+}
+
+public plugin_precache()
+{
+	for (new n=0;n<sizeof WpnSndFire;n++) precache_model(WpnSndFire[n])
+	g_shellMdl=precache_model("models/pshell.mdl")
+	g_spraySpr=precache_model("sprites/bloodspray.spr")
+	g_dropSpr=precache_model("sprites/blood.spr")
+}
+
+//自定义玩家动作在这里执行,看不懂不要改
+public fw_AddToFullPack(es_handle, e, id, host, hostflags, player, pSet)
+{
+	if (!is_user_connected(id)) return FMRES_IGNORED
+	new mode=g_SeqStart[id]
+	if (!mode) return FMRES_IGNORED
+
+	if (!is_user_alive(id))
+	{
+		g_SeqStart[id]=0
+		return FMRES_IGNORED
+	}
+	set_pdata_int(id, 73, 28, 5)
+	if (mode!=1) set_pev(id, pev_gaitsequence, g_SeqNum[id])
+	if (mode!=2) set_pev(id, pev_sequence, g_SeqNum[id])
+	if (g_SeqFrame[id]>=255.0)
+	{
+		g_SeqStart[id]=0
+		g_SeqFrame[id]=0.0
+	}
+	new Float:animtime, Float:last_check=g_SeqCheckTime[id]
+	pev(id, pev_animtime, animtime)
+	g_SeqCheckTime[id]=animtime
+	g_SeqFrame[id]+=(255.0/g_SeqLife[id]*(animtime-last_check))
+	set_pev(id, pev_frame, g_SeqFrame[id])
+	return FMRES_HANDLED
+}
+
+//武器射击事件
+public weapon_fire(id, ent, Float:spread, Float:cycletime)
+{
+	new clip=cs_get_weapon_ammo(ent)
+
+	new shotfire=get_pdata_int(ent,64,4)+1
+	new Float:accuraracy=floatmin(float(shotfire*shotfire*shotfire)/220.0+0.45,0.75)
+	set_pdata_int(ent, 64, shotfire, 4)
+	set_pdata_int(ent, 59, 1, 4)
+	set_pdata_float(ent, 62, accuraracy, 4)
+	if (!clip)
+	{
+		set_pdata_float(ent, 46, cycletime+0.2, 4)
+		set_pdata_float(ent, 47, cycletime+0.2, 4)
+		ExecuteHamB(Ham_Weapon_PlayEmptySound, ent)
+		return
+	}
+	cs_set_weapon_ammo(ent, --clip)
+	new ef=pev(id,pev_effects)
+	ef|=EF_MUZZLEFLASH
+	set_pev(id, pev_effects, ef)
+	stock_set_weaponanim(id, WpnAnimFireV)
+	stock_set_playeranim(id, flags(id)&FL_DUCKING?WpnAnimFireCr:WpnAnimFireRef, cycletime, 0)
+	set_pdata_float(ent, 46, cycletime, 4)
+	set_pdata_float(ent, 47, cycletime, 4)
+	set_pdata_float(ent, 48, WpnFireIdle, 4)
+	UTIL_MakeVectors(id)
+
+	static trun
+	new Float:start[3], Float:end[3], Float:forw[3], Float:push[3]
+	pev(id, pev_origin, start)
+	pev(id, pev_view_ofs, end)
+	xs_vec_add(start, end, start)
+
+	global_get(glb_v_forward, forw)
+	xs_vec_mul_scalar(forw, WpnFireDist, forw)
+	xs_vec_add(start, forw, end)
+
+	firebullets(id, ent, start, end, WpnFireDmg)
+
+	new Float:up=spread*25.2
+	pev(id, pev_punchangle, push)
+	push[0]=floatmax(push[0]-up,-3.5)
+
+	new Float:right=spread*5.0
+	if (push[0]==-3.5) right=spread*10.0
+	if (push[1]>2.25) trun=1
+	else if (push[1]<-2.25) trun=0
+	if (trun) push[1]-=right
+	else push[1]+=right
+	set_pev(id, pev_punchangle, push)
+
+	new Float:vec[3], Float:vec2[3]
+	pev(id, pev_origin, start)
+	pev(id, pev_view_ofs, end)
+	pev(id, pev_view_ofs, vec)
+	xs_vec_add(start, end, start)
+	global_get(glb_v_up, vec)
+	xs_vec_mul_scalar(vec, -5.0, vec)
+	xs_vec_add(start, vec, start)
+	global_get(glb_v_right, vec)
+	xs_vec_mul_scalar(vec, -2.0, vec)
+	xs_vec_add(start, vec, start)
+
+	pev(id, pev_velocity, vec2)
+	global_get(glb_v_right, vec)
+	xs_vec_mul_scalar(vec, random_float(50.0,70.0), vec)
+	xs_vec_add(vec2, vec, vec2)
+	global_get(glb_v_up, vec)
+	xs_vec_mul_scalar(vec, random_float(100.0,150.0), vec)
+	xs_vec_add(vec2, vec, vec2)
+	global_get(glb_v_forward, vec)
+	xs_vec_mul_scalar(vec, 20.0, vec)
+	xs_vec_add(vec2, vec, vec2)
+	pev(id, pev_angles, vec)		 
+	stock_spawn_model(id, start, vec2, vec[1], g_shellMdl, 1)
+	emit_sound(id, CHAN_WEAPON, WpnSndFire[random(sizeof WpnSndFire)], 0.85, ATTN_NORM, 0, PITCH_NORM)
+}
+
+//武器射击造成伤害事件
+public firebullets(id, ent, const Float:start[3], const Float:end[3], Float:dmg)
+{
+	new Float:org1[3], Float:org2[3], tr, i, hit, Float:aim[3], tr2, i2, Float:aim2[3]
+	xs_vec_copy(start, org1)
+	xs_vec_copy(end, org2)
+	engfunc(EngFunc_TraceLine, org1, org2, 0, id, tr)
+	i=get_tr2(tr,TR_pHit)
+	hit=get_tr2(tr,TR_iHitgroup)
+	get_tr2(tr, TR_vecEndPos, aim)
+	if (i<0) i=0
+
+	engfunc(EngFunc_TraceLine, org1, org2, 1, -1, tr2)
+	i2=get_tr2(tr2,TR_pHit)
+	get_tr2(tr2, TR_vecEndPos, aim2)
+	if (i2<0) i2=0
+	if (pev_valid(i) && pev(i,pev_takedamage))
+	{
+		new Float:dmg2=dmg
+		if (hit==1) dmg2*=WpnDmgHead
+		else if (hit==2) dmg2*=WpnDmgChest
+		else if (hit==3) dmg2*=WpnDmgStomach
+		else if (hit==4 || hit==5) dmg2*=WpnDmgArms
+		else if (hit==6 || hit==7) dmg2*=WpnDmgLegs
+		if (is_user_alive(i) && get_user_team(i)!=get_user_team(id))
+		{
+			stock_create_blood(aim, get_pdata_int(i,89,5), floatround(dmg2/random_float(2.0,3.6)))
+			if (get_distance_f(aim,aim2)<=100.0) stock_create_decal(aim2, random_num(192,197), i2)
+		}
+		ExecuteHamB(Ham_TakeDamage, i, ent, id, dmg2, DMG_BULLET)
+	}
+	if (pev(i2,pev_solid)==4 || pev(i2,pev_movetype)==13 && !pev(i2,pev_takedamage))
+	{
+		engfunc(EngFunc_MessageBegin, MSG_PVS, SVC_TEMPENTITY, aim2, 0)
+		write_byte(TE_GUNSHOT)
+		engfunc(EngFunc_WriteCoord, aim2[0])
+		engfunc(EngFunc_WriteCoord, aim2[1])
+		engfunc(EngFunc_WriteCoord, aim2[2])
+		message_end()
+		engfunc(EngFunc_MessageBegin, MSG_PVS, SVC_TEMPENTITY, aim2, 0)
+		write_byte(TE_GUNSHOTDECAL)
+		engfunc(EngFunc_WriteCoord, aim2[0])
+		engfunc(EngFunc_WriteCoord, aim2[1])
+		engfunc(EngFunc_WriteCoord, aim2[2])
+		write_short(i2)
+		write_byte(random_num(41,45))
+		message_end()
+	}
+}
+
+//原版不知道是什么意思,或者干脆没效果.这里被我写成设置玩家射击时镜头抬起
+UTIL_MakeVectors(id)
+{
+	static Float:ang[3], Float:ang2[3]
+
+	pev(id, pev_v_angle, ang)
+	pev(id, pev_punchangle, ang2)
+
+	xs_vec_add(ang, ang2, ang)
+	engfunc(EngFunc_MakeVectors, ang)
+	set_pev(id, pev_v_angle, ang)
+}
+
+//自定义播放V模型动作,玩家id播放v模型动作anim
+stock stock_set_weaponanim(id, anim)
+{
+	set_pev(id, pev_weaponanim, anim)
+	message_begin(MSG_ONE, SVC_WEAPONANIM, {0,0,0}, id)
+	write_byte(anim)
+	write_byte(pev(id,pev_body))
+	message_end()
+}
+
+//自定义玩家播放动作,玩家id播放anim动作,持续life秒,gait=0为手动作,=1为脚动作,=2为全身动作
+stock stock_set_playeranim(id, anim, Float:life, gait)
+{
+	g_SeqStart[id]=1+gait
+	g_SeqNum[id]=anim
+	g_SeqFrame[id]=0.0
+	g_SeqLife[id]=life
+	pev(id, pev_animtime, g_SeqCheckTime[id])
+	if (gait==1) set_pev(id, pev_gaitsequence, 0)
+	set_pev(id, pev_sequence, 0)
+	set_pev(id, pev_frame, 0.0)
+	set_pev(id, pev_animtime, get_gametime())
+}
+
+//自定义产生模型,玩家id在坐标org向方向vec喷出模型model,随机旋转rotation,撞到东西的声音类型为sndtype
+stock stock_spawn_model(id, Float:start[3], Float:vec[3], Float:rotation, model, sndtype)
+{
+	new org[3]
+	FVecIVec(start, org)
+	message_begin(MSG_ONE, SVC_TEMPENTITY, org, id)
+	write_byte(TE_MODEL)
+	write_coord(floatround(start[0]))
+	write_coord(floatround(start[1]))
+	write_coord(floatround(start[2]))
+	write_coord(floatround(vec[0]))
+	write_coord(floatround(vec[1]))
+	write_coord(floatround(vec[2]))
+	write_angle(floatround(rotation))
+	write_short(model)
+	write_byte(sndtype)
+	write_byte(25)
+	message_end()
+}
+
+//自定义喷血,在坐标org喷出一堆颜色为color,尺寸为scale的血液spr
+stock stock_create_blood(const Float:org[3], color, scale)
+{
+	engfunc(EngFunc_MessageBegin, MSG_PAS, SVC_TEMPENTITY, org, 0)
+	write_byte(TE_BLOODSPRITE)
+	engfunc(EngFunc_WriteCoord, org[0])
+	engfunc(EngFunc_WriteCoord, org[1])
+	engfunc(EngFunc_WriteCoord, org[2])
+	write_short(g_spraySpr)
+	write_short(g_dropSpr)
+	write_byte(color)			//0-255,需要专门的颜色表
+	write_byte(scale)			//10为spr的正常大小,5为0.5倍大小
+	message_end()
+}
+
+//自定义印花纹理,在坐标org设置一个纹理decal,印在固体实体ent上(如果有的话)
+stock stock_create_decal(const Float:org[3], decal, ent)
+{
+	if (pev_valid(ent))
+	{
+		engfunc(EngFunc_MessageBegin, MSG_PAS, SVC_TEMPENTITY, org, 0)
+		write_byte(TE_DECAL)
+		engfunc(EngFunc_WriteCoord, org[0])
+		engfunc(EngFunc_WriteCoord, org[1])
+		engfunc(EngFunc_WriteCoord, org[2])
+		write_byte(decal)
+		write_short(ent)
+		message_end()
+	}
+	else
+	{
+		engfunc(EngFunc_MessageBegin, MSG_PAS, SVC_TEMPENTITY, org, 0)
+		write_byte(TE_WORLDDECAL)
+		engfunc(EngFunc_WriteCoord, org[0])
+		engfunc(EngFunc_WriteCoord, org[1])
+		engfunc(EngFunc_WriteCoord, org[2])
+		write_byte(decal)
+		message_end()
+	}
+}

@@ -1,0 +1,77 @@
+﻿
+/**
+ * 判断球体是否可以被射线命中.
+ *
+ * @param origin		球体中心坐标
+ * @param radius		球体的半径
+ * @param rayStart	射线的起点
+ * @param rayDir		射线的方向(长度为1的向量)
+ * @param hitPoint	返回射线的命中点
+ *
+ * @return		若射线可以命中球体,则返回true.否则返回false
+ * @error		如果没有引用xs.inc则无法编辑
+ */
+stock bool:is_sphere_rayintersect(const Float:origin[3], Float:radius, const Float:rayStart[3], const Float:rayDir[3], Float:hitPoint[3])
+{
+	new Float:angles[3]
+	xs_vec_sub(rayStart, origin, angles)
+	vector_to_angle(angles, angles)
+	angles[0] *= -1.0
+	
+	new Float:vForw[3], Float:vRight[3], Float:vUp[3], Float:p1[3], Float:p2[3], Float:p3[3]
+	engfunc(EngFunc_AngleVectors, angles, vForw, vRight, vUp)
+	get_point_offset(origin, vForw, vRight, vUp, 0.0, radius, 0.0, p1)
+	get_point_offset(origin, vForw, vRight, vUp, 0.0, -radius, 0.0, p2)
+	get_point_offset(origin, vForw, vRight, vUp, 0.0, 0.0, radius, p3)
+	
+	// 根据球体的三个坐标创建一个无限大的平面
+	new Float:plane[4]
+	xs_plane_3p(plane, p1, p2, p3)
+	// 若 射线和无限大平面存在交点
+	if (xs_plane_rayintersect(plane, rayStart, rayDir, hitPoint)) 
+	{
+		/**
+		*   设origin为A,hitPoint为B,命中点为C,rayStart为O,ABC和ABO形成三角形.
+		*   画线段AD垂直于BC.由于AB,OB的长度已知.AC等于radius,可求BD,DC长度.
+		*   求出OC=OB-BD-DC,最终算出命中点C具体坐标
+		*/
+		new Float:AB = get_distance_f(origin, hitPoint)
+		
+		// 若 AB长度小于球体的半径,说明命中
+		if (AB <= radius)
+		{
+			new Float:OB = xs_vec_distance(hitPoint, rayStart)
+			new Float:angABO = floatacos(AB / OB, degrees)
+			new Float:BD = AB / OB * AB
+			new Float:AD = floatsin(angABO, degrees) * AB
+			new Float:DC = floatsqroot(radius * radius - AD * AD)
+			new Float:OC = OB - BD - DC
+			
+			xs_vec_mul_scalar(rayDir, OC, vForw)
+			xs_vec_add(rayStart, vForw, hitPoint)
+			return true
+		}
+	}
+	
+	return false
+}
+/**
+ * 把坐标自身角度当做参考系进行移动
+ *
+ * @param origin		原点坐标
+ * @param vForw		前向量(原点角度转化的向量,长度必须是1)
+ * @param vRight		右向量(原点角度右转90度后转化的向量,长度必须是1)
+ * @param vUp		顶向量(原点角度抬头90度后转化的向量,长度必须是1)
+ * @param forw		向前移动原点
+ * @param right		向右移动原点
+ * @param up		向上移动原点
+ * @param ret		返回移动原点后得到的坐标
+ *
+ * @noreturn
+ */
+stock get_point_offset(const Float:origin[3], const Float:vForw[3], const Float:vRight[3], const Float:vUp[3], Float:forw, Float:right, Float:up, Float:ret[3])
+{
+	ret[0] = origin[0] + vForw[0] * forw + vRight[0] * right + vUp[0] * up
+	ret[1] = origin[1] + vForw[1] * forw + vRight[1] * right + vUp[1] * up
+	ret[2] = origin[2] + vForw[2] * forw + vRight[2] * right + vUp[2] * up
+}

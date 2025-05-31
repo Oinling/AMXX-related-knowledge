@@ -1,0 +1,2 @@
+m_lastDamageAmount	每次伤害重置
+pev_dmg_take		UpdateClientData重置

@@ -1,0 +1,16 @@
+// vecP将会平行于地面
+static fff(const Float:vecF[3], const Float:vecNormal[3], Float:vecP[3])
+{
+	xs_vec_mul_scalar(vecNormal, xs_vec_dot(vecF, vecNormal), vecP);
+	xs_vec_sub(vecF, vecP, vecP);
+	xs_vec_normalize(vecP, vecP);
+}
+
+// 另一种算法,不改变水平分量
+static fff2(const Float:vecF[3], const Float:vecNormal[3], Float:vecP[3])
+{
+	if (vecNormal[2] == 0.0) { vecP[0] = vecP[1], vecP[2] = 0.0 < vecF[2] ? 1.0 : -1.0; return; }
+	vecP = vecF;
+	vecP[2] -= xs_vec_dot(vecP, vecNormal) / vecNormal[2];
+	xs_vec_normalize(vecP, vecP);
+}

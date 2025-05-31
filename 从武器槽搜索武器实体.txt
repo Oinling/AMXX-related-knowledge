@@ -1,0 +1,22 @@
+/**
+ * 从玩家的武器槽里面查找武器
+ * 参数1:填玩家实体索引
+ * 参数2:填武器品种索引(例如CSW_KNIFE,CSW_AK47)
+ * 返回值:找到武器则返回武器实体索引,否则返回-1
+*/
+static Player_GetWpnEntByWpnId(playerEntId, wpnId)
+{
+	static const m_rgpPlayerItems[] = { 367, 368, 369, 370, 371, 372 };
+	for (new wpnEntId, slotNumber = 1; slotNumber < sizeof(m_rgpPlayerItems); slotNumber++)
+	{
+		wpnEntId = get_pdata_cbase(playerEntId, m_rgpPlayerItems[slotNumber]);
+		while (pev_valid(wpnEntId))
+		{
+			const m_iId = 43;
+			if (get_pdata_int(wpnEntId, m_iId, 4) == wpnId) return wpnEntId;
+			const m_pNext = 42;
+			wpnEntId = get_pdata_cbase(wpnEntId, m_pNext, 4);
+		}
+	}
+	return -1;
+}

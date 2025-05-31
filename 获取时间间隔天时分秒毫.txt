@@ -1,0 +1,20 @@
+
+enum TimeSpanStruct
+{
+	TSS_Days,
+	TSS_Hours,
+	TSS_Minutes,
+	TSS_Seconds,
+	TSS_Milliseconds
+}
+
+static Timespan(Float:seconds, timespan[TimeSpanStruct])
+{
+	new total = floatround(seconds, floatround_floor);
+	
+	timespan[TSS_Days] = total / 86400;
+	timespan[TSS_Hours] = total % 86400 / 3600;
+	timespan[TSS_Minutes] = total % 3600 / 60;
+	timespan[TSS_Seconds] = total % 60;
+	timespan[TSS_Milliseconds] = floatround(floatfract(timespan) * 1000.0);
+}

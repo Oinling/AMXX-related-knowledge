@@ -1,0 +1,70 @@
+/* 函数介绍:判断眼睛坐标是否能看见目标实体 */
+/* 参数1:观察者眼睛坐标 */
+/* 参数2:被观察的目标 */
+/* 参数3:要对目标进行多少次环绕扫描,低于1表示不进行环绕扫描 */
+/* 参数4:每次环绕扫描有多少个方向,低于2表示不进行多角度扫描 */
+stock bool:is_visible_ex(Float:eyePos[3], target, layers = 2, faces = 4)
+{
+	new Float:origin[3]
+	pev(target, pev_origin, origin)
+	
+	if (layers < 1) return is_visible(eyePos, origin)
+	
+	new Float:mins[3], Float:maxs[3]
+	pev(target, pev_mins, mins)
+	pev(target, pev_maxs, maxs)
+	
+	new Float:height = maxs[2] - mins[2]
+	new Float:zStart = origin[2] + mins[2]
+	new f, Float:angles[3], Float:vector[3], Float:tempOrigin[3]
+	for (new l = 0; l < layers; l++)
+	{
+		if (layers == 1) origin[2] = zStart + height / 2.0
+		else origin[2] = zStart + float(l) * height / float(layers - 1)
+		
+		if (faces < 2)
+		{
+			if (is_visible(eyePos, origin)) return true
+			continue
+		}
+		
+		for (f = 0; f < faces; f++)
+		{
+			angles[1] = float(f) * 360.0 / float(faces)
+			angle_vector(angles, 1, vector)
+			xs_vec_mul_scalar(vector, maxs[0], vector)
+			xs_vec_add(origin, vector, tempOrigin)
+			if (is_visible(eyePos, tempOrigin)) return true
+		}
+	}
+	return false
+}
+
+/* 函数介绍:判断眼睛坐标是否能看见另一个坐标 */
+/* 参数1:观察者眼睛坐标 */
+/* 参数2:被观察的坐标 */
+/* 参数3:是否修复极少数情况下会出现的bug(指fraction无限接近1.0) */
+stock bool:is_visible(Float:eyePos[3], Float:point[3], bool:fixBug = false)
+{
+	engfunc(EngFunc_TraceLine, eyePos, point, 1, -1, 0)
+	
+	new Float:fraction
+	get_tr2(0, TR_flFraction, fraction)
+	if (fraction == 1.0) return true
+	
+	if (fixBug && 0.9 < fraction)
+	{
+		new Float:distance = get_distance_f(eyePos, point)
+		// 若 预期距离 减 实际距离 的差值 小于 1单位, 说明看得见
+		if (distance - fraction * distance < 1.0) return true
+	}
+	return false
+}
+
+
+
+
+
+
+
+

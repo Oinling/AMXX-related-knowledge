@@ -1,0 +1,87 @@
+
+
+// 子弹品种索引
+enum AmmoType
+{
+	AT_NONE,
+	AT_338MAGNUM,
+	AT_762NATO,
+	AT_556NATOBOX,
+	AT_556NATO,
+	AT_BUCKSHOT,
+	AT_45ACP,
+	AT_57MM,
+	AT_50AE,
+	AT_357SIG,
+	AT_9MM,
+	AT_FLASHBANG,
+	AT_HEGRENADE,
+	AT_SMOKEGRENADE,
+	AT_C4
+}
+
+// 每种子弹的最大备用数量
+enum MaxAmmoType
+{
+	MAT_NONE,
+	MAT_338MAGNUM  = 30,
+	MAT_762NATO    = 90,
+	MAT_556NATOBOX = 200,
+	MAT_556NATO    = 90,
+	MAT_BUCKSHOT   = 32,
+	MAT_45ACP      = 100,
+	MAT_57MM       = 100,
+	MAT_50AE       = 35,
+	MAT_357SIG     = 52,
+	MAT_9MM        = 120,
+
+	MAT_FLASHBANG    = 2,
+	MAT_HEGRENADE    = 1,
+	MAT_SMOKEGRENADE = 1,
+	MAT_C4           = 1
+}
+
+enum WpnSlotType
+{
+	WST_NONE,
+	WST_PRIMARY_WEAPON,
+	WST_PISTOL,
+	WST_KNIFE,
+	WST_GRENADE,
+	WST_C4,
+};
+
+// 枚举二进制位标志:武器插槽Hud标志
+enum WpnSlotFlags (<<= 0b00001)
+{
+	// 全部默认,除了手雷和c4,都是这个标志
+	WSF_NONE		= 0b00000,
+	// 猜测:没子弹也能拔枪
+	WSF_SELECT_OM_EMPTY	= 0b00001,
+	// 猜测:不自动装填
+	WSF_NO_AUTO_RELOAD	= 0b00010,
+	// 猜测:不自动切换有子弹武器
+	WSF_NO_AUTO_SWITCH_EMPTY= 0b00100,
+	// 不清楚,手雷和c4会拥有这个标志
+	WSF_LIMIT_IN_WORLD	= 0b01000,
+	// 不清楚,手雷和c4会拥有这个标志
+	WSF_EXHAUSTIBLE		= 0b10000,
+};
+
+enum sWpnClass
+{
+	_:		WC_ClassName[24],
+	AmmoType:	WC_PrimAmmoId,
+	MaxAmmoType:	WC_MaxPrimAmmos,
+	AmmoType:	WC_SecAmmoId,
+	MaxAmmoType:	WC_MaxSecAmmo,
+	WpnSlotType:	WC_SlotId,
+	_:		WC_SlotLineId,
+	_:		WC_ClassId,
+	WpnSlotFlags:	WC_SlotFlags
+}
+
+static const gWpnClasses[][sWpnClass] =
+{
+	{ "weapon_9mmar",	AT_9MM,		MAT_9MM,	AT_HEGRENADE,	MAT_HEGRENADE,	WST_PISTOL,	0,	CSW_AK47,	WSF_NONE		}
+};

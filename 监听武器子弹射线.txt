@@ -1,0 +1,72 @@
+#include <amxmodx>
+#include <fakemeta>
+#include <hamsandwich>
+#include <xs>
+
+#pragma semicolon 1;
+
+enum ExplosionFlags (<<= 1)
+{
+	EF_None,
+	EF_NoAdditive = 1,
+	EF_NoDLight,
+	EF_NoSound,
+	EF_NoParticles
+}
+
+static gSprId_BlueFlare1;
+
+static gBulletTraceMark = cellmin;
+
+public plugin_precache()
+{
+	gSprId_BlueFlare1 = precache_model("sprites/blueflare1.spr");
+}
+
+public plugin_init()
+{
+	register_plugin("Test 1", "1", "偶萤蛉(Oinling)");
+	
+	register_forward(FM_TraceLine, "Trace_Line_Post", 1);
+	
+	for (new wpnName[20], wpnId = CSW_P228; wpnId < CSW_VEST; wpnId++)
+	{
+		get_weaponname(wpnId, wpnName, charsmax(wpnName));
+		if (wpnName[0] == EOS) continue;
+		RegisterHam(Ham_Weapon_PrimaryAttack, wpnName, "Weapon_PrimaryAttack_Pre");
+		RegisterHam(Ham_Weapon_PrimaryAttack, wpnName, "Weapon_PrimaryAttack_Post", 1);
+	}
+}
+
+public Trace_Line_Post(const Float:origin[3], const Float:dest[3], ignoreFlags, skipedEntId, traceHandle)
+{
+	if (gBulletTraceMark < cellmin) return;
+	if (gBulletTraceMark == skipedEntId) gBulletTraceMark = traceHandle;
+	else if (traceHandle != gBulletTraceMark) return;
+	
+	new Float:fraction;
+	get_tr2(traceHandle, TR_flFraction, fraction);
+	if (fraction == 1.0) return;
+	
+	new Float:hitPoint[3];
+	get_tr2(traceHandle, TR_vecEndPos, hitPoint);
+	SendMsg_Explosion(hitPoint, 5, 1, EF_NoSound | EF_NoDLight | EF_NoParticles);
+}
+
+public Weapon_PrimaryAttack_Pre(wpnEntId) gBulletTraceMark = pev(wpnEntId, pev_owner);
+
+public Weapon_PrimaryAttack_Post(wpnEntId) gBulletTraceMark = cellmin;
+
+static SendMsg_Explosion(const Float:position[3], scale, framerate, ExplosionFlags:flags)
+{
+	engfunc(EngFunc_MessageBegin, MSG_BROADCAST, SVC_TEMPENTITY, position, 0);
+	write_byte(TE_EXPLOSION);
+	engfunc(EngFunc_WriteCoord, position[0]);
+	engfunc(EngFunc_WriteCoord, position[1]);
+	engfunc(EngFunc_WriteCoord, position[2]);
+	write_short(gSprId_BlueFlare1);
+	write_byte(scale);	// scale in 0.1's
+	write_byte(framerate);	// framerate
+	write_byte(_:flags);	// flags
+	message_end();
+}

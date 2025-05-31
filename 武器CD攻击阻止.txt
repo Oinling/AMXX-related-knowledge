@@ -1,0 +1,13 @@
+
+#define IUSER3_CANSHOOT		(1<<0)	// 可以攻击,比如安装C4时这个标记是被抹去的
+#define IUSER3_FREEZETIMEOVER	(1<<1)	// 在冻结时间
+#define IUSER3_INBOMBZONE	(1<<2)	// 是否在爆破区域
+#define IUSER3_HOLDINGSHIELD	(1<<3)	// 是否用盾牌防御
+
+public FW_UpdateClientData_Post(client, sendweapon, handle)
+{
+	if (get_cd(handle, CD_DeadFlag) != DEAD_NO)
+		return
+
+	set_cd(handle, CD_iUser3, get_cd(handle, CD_iUser3) & ~IUSER3_CANSHOOT)
+}
